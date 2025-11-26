@@ -1,5 +1,6 @@
 import { query } from '$app/server';
-import { JACKETT_API_KEY, JACKETT_URL } from '$env/static/private';
+// CHANGE THIS LINE: Use dynamic private env
+import { env } from '$env/dynamic/private';
 import * as v from 'valibot';
 
 import type { Torrent } from '$lib/types';
@@ -7,10 +8,16 @@ import type { Torrent } from '$lib/types';
 export const searchTorrents = query(v.string(), async (searchTerm: string) => {
     if (!searchTerm) return [];
 
+    // UPDATE USAGE: Access variables via 'env.'
+    const apiKey = env.JACKETT_API_KEY;
+    const jackettUrl = env.JACKETT_URL;
+
     const limit = 1000;
-    const apiUrl = `${JACKETT_URL}/api/v2.0/indexers/all/results?query=${encodeURIComponent(searchTerm)}&apikey=${JACKETT_API_KEY}&limit=${limit}`;
+    // Update the URL string interpolation
+    const apiUrl = `${jackettUrl}/api/v2.0/indexers/all/results?query=${encodeURIComponent(searchTerm)}&apikey=${apiKey}&limit=${limit}`;
 
     try {
+        // ... rest of your code remains the same
         const response = await fetch(apiUrl);
 
         if (!response.ok) {
