@@ -118,7 +118,7 @@
 
 	.search-form {
 		width: 100%;
-		max-width: 700px;
+		max-width: 100%;
 		margin-bottom: 2rem;
 	}
 

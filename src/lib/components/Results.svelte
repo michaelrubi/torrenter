@@ -1,12 +1,21 @@
 <script lang="ts">
 	import type { Torrent } from '$lib/types';
-	import { fade } from 'svelte/transition';
+	import { fade, scale } from 'svelte/transition';
+	import { extractTags, type TagCategory } from '$lib/utils/title-parser';
 
 	let { results }: { results: Torrent[] } = $props();
 
 	let sortColumn = $state('seeds');
 	let sortDirection = $state('desc');
 	let filterQuery = $state('');
+	let selectedFilters = $state<Record<TagCategory, Set<string>>>({
+		Resolution: new Set(),
+		Source: new Set(),
+		Codec: new Set(),
+		Audio: new Set(),
+		Other: new Set()
+	});
+	let isFilterMenuOpen = $state(false);
 	let currentPage = $state(1);
 	let copiedMagnet = $state<string | null>(null);
 	const itemsPerPage = 20;
@@ -50,10 +59,71 @@
 		}
 	}
 
+	function toggleFilter(category: TagCategory, tag: string) {
+		const newCategorySet = new Set(selectedFilters[category]);
+		if (newCategorySet.has(tag)) {
+			newCategorySet.delete(tag);
+		} else {
+			newCategorySet.add(tag);
+		}
+
+		selectedFilters = {
+			...selectedFilters,
+			[category]: newCategorySet
+		};
+		currentPage = 1;
+	}
+
+	let availableTags = $derived.by(() => {
+		const tags: Record<TagCategory, Set<string>> = {
+			Resolution: new Set(),
+			Source: new Set(),
+			Codec: new Set(),
+			Audio: new Set(),
+			Other: new Set()
+		};
+
+		results.forEach((r) => {
+			const extracted = extractTags(r.title);
+			(Object.keys(extracted) as TagCategory[]).forEach((category) => {
+				extracted[category].forEach((tag) => tags[category].add(tag));
+			});
+		});
+
+		return {
+			Resolution: Array.from(tags.Resolution).sort(),
+			Source: Array.from(tags.Source).sort(),
+			Codec: Array.from(tags.Codec).sort(),
+			Audio: Array.from(tags.Audio).sort(),
+			Other: Array.from(tags.Other).sort()
+		};
+	});
+
 	let filteredResults = $derived(
-		filterQuery
-			? results.filter((r) => r.title.toLowerCase().includes(filterQuery.toLowerCase()))
-			: results
+		results.filter((r) => {
+			const matchesQuery = filterQuery
+				? r.title.toLowerCase().includes(filterQuery.toLowerCase())
+				: true;
+
+			if (!matchesQuery) return false;
+
+			const hasAnyFilter = Object.values(selectedFilters).some((set) => set.size > 0);
+			if (!hasAnyFilter) return true;
+
+			const titleTags = extractTags(r.title);
+
+			// Check each category
+			for (const category of Object.keys(selectedFilters) as TagCategory[]) {
+				const categoryFilters = selectedFilters[category];
+				if (categoryFilters.size === 0) continue;
+
+				// OR logic within category: Title must have AT LEAST ONE of the selected tags in this category
+				const hasMatch = titleTags[category].some((tag) => categoryFilters.has(tag));
+				if (!hasMatch) return false;
+			}
+
+			return true;
+		})
 	);
 
 	$effect(() => {
@@ -100,6 +170,20 @@
 	);
 
 	let totalPages = $derived(Math.ceil(sortedResults.length / itemsPerPage));
+	let activeFilterCount = $derived(
+		Object.values(selectedFilters).reduce((acc, set) => acc + set.size, 0)
+	);
+
+	function clearAllFilters() {
+		selectedFilters = {
+			Resolution: new Set(),
+			Source: new Set(),
+			Codec: new Set(),
+			Audio: new Set(),
+			Other: new Set()
+		};
+		currentPage = 1;
+	}
 </script>
 
 <div class="filter-container">
@@ -126,10 +210,123 @@
 			</button>
 		{/if}
 	</div>
+
+	<button
+		class="filter-toggle-btn {isFilterMenuOpen ? 'active' : ''}"
+		onclick={() => (isFilterMenuOpen = !isFilterMenuOpen)}
+		title="Toggle Filters"
+	>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="18"
+			height="18"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg
+		>
+		{#if activeFilterCount > 0}
+			<span class="filter-badge">{activeFilterCount}</span>
+		{/if}
+	</button>
+
 	<span class="results-count">
 		{filteredResults.length}/{results.length} results found
 	</span>
 </div>
+
+{#if activeFilterCount > 0}
+	<div class="active-filters-bar" transition:fade={{ duration: 150 }}>
+		{#each Object.keys(selectedFilters) as TagCategory[] as category}
+			{#each selectedFilters[category] as tag}
+				<button class="active-filter-chip" onclick={() => toggleFilter(category, tag)}>
+					{tag}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"
+						></line></svg
+					>
+				</button>
+			{/each}
+		{/each}
+		<button class="clear-all-btn" onclick={clearAllFilters}>Clear all</button>
+	</div>
+{/if}
+
+{#if isFilterMenuOpen}
+	<div
+		class="modal-backdrop"
+		transition:fade={{ duration: 200 }}
+		onclick={() => (isFilterMenuOpen = false)}
+		onkeydown={(e) => e.key === 'Escape' && (isFilterMenuOpen = false)}
+		role="button"
+		tabindex="0"
+		aria-label="Close modal"
+	></div>
+	<div
+		class="filters-modal"
+		transition:scale={{ duration: 200, start: 0.95 }}
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="filters-header">
+			<h3>Filters</h3>
+			<div class="header-actions">
+				{#if activeFilterCount > 0}
+					<button class="clear-all-text-btn" onclick={clearAllFilters}>Clear all</button>
+				{/if}
+				<button
+					class="close-modal-btn"
+					onclick={() => (isFilterMenuOpen = false)}
+					aria-label="Close filters"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"
+						></line></svg
+					>
+				</button>
+			</div>
+		</div>
+		<div class="filters-grid">
+			{#each Object.keys(availableTags) as TagCategory[] as category}
+				{#if availableTags[category].length > 0}
+					<div class="filter-group">
+						<div class="filter-group-title">{category}</div>
+						<div class="tags-filter">
+							{#each availableTags[category] as tag}
+								<button
+									class="tag-btn {selectedFilters[category].has(tag) ? 'active' : ''}"
+									onclick={() => toggleFilter(category, tag)}
+								>
+									{tag}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			{/each}
+		</div>
+	</div>
+{/if}
 
 <div class="table-container">
 	<table>
@@ -402,6 +599,226 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.filter-toggle-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: 8px;
+		background-color: var(--surface-color);
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		cursor: pointer;
+		position: relative;
+		transition: all 0.2s;
+	}
+
+	.filter-toggle-btn:hover {
+		border-color: var(--accent-color);
+		color: var(--text-primary);
+	}
+
+	.filter-toggle-btn.active {
+		background-color: var(--accent-color);
+		border-color: var(--accent-color);
+		color: white;
+	}
+
+	.filter-badge {
+		position: absolute;
+		top: -5px;
+		right: -5px;
+		background-color: var(--accent-color);
+		color: white;
+		font-size: 0.7rem;
+		font-weight: bold;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 2px solid var(--background-color);
+	}
+
+	.modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background-color: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(4px);
+		z-index: 100;
+	}
+
+	.filters-modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		background-color: var(--surface-color);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		padding: 2rem;
+		width: 90%;
+		max-width: 800px;
+		max-height: 85vh;
+		overflow-y: auto;
+		z-index: 101;
+		box-shadow:
+			0 20px 25px -5px rgba(0, 0, 0, 0.1),
+			0 10px 10px -5px rgba(0, 0, 0, 0.04);
+	}
+
+	.filters-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 2rem;
+		position: sticky;
+		top: -2rem; /* Compensate for padding */
+		background-color: var(--surface-color);
+		z-index: 10;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.filters-header h3 {
+		margin: 0;
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.close-modal-btn {
+		background: none;
+		border: none;
+		color: var(--text-secondary);
+		cursor: pointer;
+		padding: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		transition: all 0.2s;
+	}
+
+	.close-modal-btn:hover {
+		background-color: rgba(255, 255, 255, 0.1);
+		color: var(--text-primary);
+	}
+
+	.clear-all-text-btn {
+		background: none;
+		border: none;
+		color: var(--text-secondary);
+		font-size: 0.9rem;
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0;
+	}
+
+	.clear-all-text-btn:hover {
+		color: var(--accent-color);
+	}
+
+	.filters-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 2rem;
+	}
+
+	.active-filters-bar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		align-items: center;
+	}
+
+	.active-filter-chip {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		background-color: rgba(var(--accent-color-rgb), 0.15);
+		border: 1px solid var(--accent-color);
+		color: var(--accent-color);
+		padding: 0.25rem 0.75rem;
+		border-radius: 1rem;
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.active-filter-chip:hover {
+		background-color: rgba(var(--accent-color-rgb), 0.25);
+	}
+
+	.clear-all-btn {
+		background: none;
+		border: none;
+		color: var(--text-secondary);
+		font-size: 0.8rem;
+		cursor: pointer;
+		margin-left: 0.5rem;
+	}
+
+	.clear-all-btn:hover {
+		color: var(--text-primary);
+		text-decoration: underline;
+	}
+
+	.filter-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.filter-group-title {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.tags-filter {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.tag-btn {
+		background-color: var(--surface-color);
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		padding: 0.25rem 0.75rem;
+		border-radius: 1rem;
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.tag-btn:hover {
+		border-color: var(--accent-color);
+		color: var(--text-primary);
+	}
+
+	.tag-btn.active {
+		background-color: var(--accent-color);
+		color: white;
+		border-color: var(--accent-color);
 	}
 
 	.filter-input-wrapper {
