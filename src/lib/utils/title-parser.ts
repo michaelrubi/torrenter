@@ -23,7 +23,7 @@ export function extractTags(title: string): Record<TagCategory, string[]> {
     if (/\bdvdrip\b|\bdvd\b/i.test(title)) tags.Source.add('DVD');
     if (/\bhdrip\b/i.test(title)) tags.Source.add('HDRip');
     if (/\bcam\b|\bhdcam\b/i.test(title)) tags.Source.add('CAM');
-    if (/\bts\b|\bhd-?ts\b|\btelevison sync\b/i.test(title)) tags.Source.add('TS');
+    if (/\bts\b|\bhd-?ts\b|\btelevison sync\b|\btelesync\b/i.test(title)) tags.Source.add('TS');
     if (/\btc\b|\bhd-?tc\b|\btelecine\b/i.test(title)) tags.Source.add('TC');
     if (/\bscr\b|\bscreener\b|\bdvdscr\b/i.test(title)) tags.Source.add('Screener');
 
