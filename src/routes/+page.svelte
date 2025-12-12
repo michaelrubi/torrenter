@@ -4,43 +4,98 @@
 	import MediaCard from '$lib/components/MediaCard.svelte';
 	import { searchTorrents, getDiscoveryContent } from './data.remote';
 	import type { DiscoveryItem } from '$lib/types';
-	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	let searchTerm = $state('');
 	let results: any[] = $state([]);
 	let discoveryResults: DiscoveryItem[] = $state([]);
 	let loading = $state(false);
 	let hasSearched = $state(false);
-
 	let mediaType: 'movie' | 'tv' = $state('movie');
-	let hasDiscoveryLoaded = $state(false);
-
-	$effect(() => {
-		// Fetch new content when mediaType changes
-		// Use an IIFE to handle async in effect
-		(async () => {
-			discoveryResults = await getDiscoveryContent({ page: 1, mediaType });
-		})();
-	});
 
 	let formElement: HTMLFormElement;
+	let lastQuery = '';
 
-	async function handleSearch(e: Event) {
-		e.preventDefault();
-		if (!searchTerm.trim()) return;
+	$effect(() => {
+		// Read the URL query parameter
+		const q = $page.url.searchParams.get('q') || '';
 
+		console.log('Effect triggered. URL q:', q, 'Last q:', lastQuery);
+
+		// If URL query changed (or on initial load)
+		if (q !== lastQuery) {
+			lastQuery = q;
+			searchTerm = q; // Sync input visually state
+
+			if (q) {
+				// If there is a query, perform search
+				// Use untracked execution for async function to avoid weird dependency loops if it touched signals (it doesn't really, but safe)
+				performSearch(q);
+			} else {
+				// If URL cleared, reset to discovery
+				resetSearch();
+			}
+		} else if (!q && !hasSearched && discoveryResults.length === 0 && !loading) {
+			// Initial load of discovery if nothing else happened and we are on home
+			loadDiscovery();
+		}
+	});
+
+	// Watch mediaType changes independently
+	// This effect runs when mediaType changes
+	$effect(() => {
+		// We only care about mediaType changes if we are NOT searching
+		const q = $page.url.searchParams.get('q');
+		if (!q && !loading) {
+			console.log('MediaType changed or init discovery. Type:', mediaType);
+			loadDiscovery();
+		}
+	});
+
+	async function loadDiscovery() {
+		console.log('Loading discovery content...');
+		try {
+			const data = await getDiscoveryContent({ page: 1, mediaType });
+			discoveryResults = data;
+		} catch (e) {
+			console.error('Discovery load failed', e);
+		}
+	}
+
+	function resetSearch() {
+		console.log('Resetting search');
+		searchTerm = '';
+		hasSearched = false;
+		results = [];
+		// Don't auto-load discovery here, let the effect logic handle it if needed,
+		// OR explicit call:
+		loadDiscovery();
+	}
+
+	async function performSearch(term: string) {
+		console.log('Performing search for:', term);
 		loading = true;
 		hasSearched = true;
 		results = [];
 
 		try {
-			results = await searchTorrents(searchTerm);
+			results = await searchTorrents(term);
+			console.log('Search results:', results.length);
 		} catch (error) {
 			console.error('Search failed:', error);
-			// Optional: Add error handling UI
+			// reset so user isn't stuck
+			results = [];
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function handleSearch(e: Event) {
+		e.preventDefault();
+		const trimmed = searchTerm.trim();
+		// Always navigate. If empty, go to root.
+		goto(`/?q=${encodeURIComponent(trimmed)}`, { keepFocus: true });
 	}
 </script>
 

@@ -241,7 +241,8 @@
 
 {#if activeFilterCount > 0}
 	<div class="active-filters-bar" transition:fade={{ duration: 150 }}>
-		{#each Object.keys(selectedFilters) as category}
+		{#each Object.keys(selectedFilters) as key}
+			{@const category = key as TagCategory}
 			{#each selectedFilters[category] as tag}
 				<button class="active-filter-chip" onclick={() => toggleFilter(category, tag)}>
 					{tag}
