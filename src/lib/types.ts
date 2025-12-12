@@ -9,3 +9,12 @@ export interface Torrent {
     publishDate: string;
     tracker: string;
 }
+
+export interface DiscoveryItem {
+    id: number;
+    title: string;
+    posterPath: string;
+    releaseDate: string;
+    overview: string;
+    mediaType: 'movie' | 'tv';
+}

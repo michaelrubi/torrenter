@@ -99,6 +99,8 @@
 		};
 	});
 
+	let categories = $derived(Object.keys(availableTags) as TagCategory[]);
+
 	let filteredResults = $derived(
 		results.filter((r) => {
 			const matchesQuery = filterQuery
@@ -239,7 +241,7 @@
 
 {#if activeFilterCount > 0}
 	<div class="active-filters-bar" transition:fade={{ duration: 150 }}>
-		{#each Object.keys(selectedFilters) as TagCategory[] as category}
+		{#each Object.keys(selectedFilters) as category}
 			{#each selectedFilters[category] as tag}
 				<button class="active-filter-chip" onclick={() => toggleFilter(category, tag)}>
 					{tag}
@@ -307,7 +309,7 @@
 			</div>
 		</div>
 		<div class="filters-grid">
-			{#each Object.keys(availableTags) as TagCategory[] as category}
+			{#each categories as category}
 				{#if availableTags[category].length > 0}
 					<div class="filter-group">
 						<div class="filter-group-title">{category}</div>

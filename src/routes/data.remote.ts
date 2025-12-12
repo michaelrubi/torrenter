@@ -65,3 +65,48 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
         throw new Error('Failed to fetch results');
     }
 });
+
+
+
+export const getDiscoveryContent = query(v.object({
+    page: v.optional(v.number(), 1),
+    mediaType: v.optional(v.picklist(['movie', 'tv']), 'movie')
+}), async ({ page = 1, mediaType = 'movie' }: { page?: number, mediaType?: 'movie' | 'tv' }) => {
+    const apiKey = env.TMDB_API_KEY;
+    if (!apiKey) {
+        throw new Error('TMDB_API_KEY is not set');
+    }
+
+    const url = new URL(`https://api.themoviedb.org/3/discover/${mediaType}`);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('sort_by', 'popularity.desc');
+    url.searchParams.set('watch_region', 'US');
+    url.searchParams.set('with_watch_monetization_types', 'flatrate|rent|buy');
+    url.searchParams.set('include_adult', 'false');
+    url.searchParams.set('language', 'en-US');
+    url.searchParams.set('page', page.toString());
+
+    try {
+        const response = await fetch(url.toString());
+
+        if (!response.ok) {
+            throw new Error(`TMDB API responded with ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        return data.results.map((item: any) => ({
+            id: item.id,
+            title: item.title || item.name, // generic title for movies, name for tv
+            posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
+            releaseDate: item.release_date || item.first_air_date, // release_date for movies, first_air_date for tv
+            overview: item.overview,
+            mediaType: mediaType
+        }));
+
+    } catch (error) {
+        console.error('Discovery error:', error);
+        return [];
+    }
+});
+

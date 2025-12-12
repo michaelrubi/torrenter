@@ -1,12 +1,29 @@
 <script lang="ts">
 	import Results from '$lib/components/Results.svelte';
 	import SkeletonResults from '$lib/components/SkeletonResults.svelte';
-	import { searchTorrents } from './data.remote';
+	import MediaCard from '$lib/components/MediaCard.svelte';
+	import { searchTorrents, getDiscoveryContent } from './data.remote';
+	import type { DiscoveryItem } from '$lib/types';
+	import { onMount } from 'svelte';
 
 	let searchTerm = $state('');
 	let results: any[] = $state([]);
+	let discoveryResults: DiscoveryItem[] = $state([]);
 	let loading = $state(false);
 	let hasSearched = $state(false);
+
+	let mediaType: 'movie' | 'tv' = $state('movie');
+	let hasDiscoveryLoaded = $state(false);
+
+	$effect(() => {
+		// Fetch new content when mediaType changes
+		// Use an IIFE to handle async in effect
+		(async () => {
+			discoveryResults = await getDiscoveryContent({ page: 1, mediaType });
+		})();
+	});
+
+	let formElement: HTMLFormElement;
 
 	async function handleSearch(e: Event) {
 		e.preventDefault();
@@ -31,7 +48,7 @@
 	<div class="search-wrapper">
 		<h1 class="greeting">Movie & TV Show Search</h1>
 
-		<form onsubmit={handleSearch} class="search-form">
+		<form bind:this={formElement} onsubmit={handleSearch} class="search-form">
 			<div class="input-group">
 				<input
 					type="text"
@@ -83,10 +100,44 @@
 				<p class="no-results">No results found for "{searchTerm}"</p>
 				<p class="empty-hint">Try adjusting your search terms or check your spelling.</p>
 			</div>
-		{/if}
-
-		{#if results.length > 0}
+		{:else if hasSearched && results.length > 0}
 			<Results {results} />
+		{:else if !hasSearched && !searchTerm}
+			<div class="discovery-section">
+				<div class="discovery-header">
+					<h2 class="section-title">
+						Popular {mediaType === 'movie' ? 'Movies' : 'TV Shows'} to Stream
+					</h2>
+					<div class="toggle-group">
+						<button
+							class="toggle-btn {mediaType === 'movie' ? 'active' : ''}"
+							onclick={() => (mediaType = 'movie')}
+						>
+							Movies
+						</button>
+						<button
+							class="toggle-btn {mediaType === 'tv' ? 'active' : ''}"
+							onclick={() => (mediaType = 'tv')}
+						>
+							TV Shows
+						</button>
+					</div>
+				</div>
+				<div class="media-grid">
+					{#each discoveryResults as item (item.id)}
+						<MediaCard
+							title={item.title}
+							posterUrl={item.posterPath}
+							year={new Date(item.releaseDate).getFullYear().toString()}
+							onClick={() => {
+								searchTerm = item.title;
+								// Trigger search next tick to ensure hydration/state update
+								setTimeout(() => formElement?.requestSubmit(), 0);
+							}}
+						/>
+					{/each}
+				</div>
+			</div>
 		{/if}
 	</div>
 </div>
@@ -212,5 +263,58 @@
 	.empty-hint {
 		font-size: 0.9rem;
 		opacity: 0.7;
+	}
+
+	.discovery-section {
+		width: 100%;
+		margin-top: 2rem;
+	}
+
+	.section-title {
+		font-size: 1.5rem;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.discovery-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 1.5rem;
+	}
+
+	.toggle-group {
+		display: flex;
+		background-color: var(--surface-color);
+		padding: 0.25rem;
+		border-radius: 8px;
+		border: 1px solid var(--border-color);
+	}
+
+	.toggle-btn {
+		background: none;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		color: var(--text-secondary);
+		cursor: pointer;
+		font-weight: 500;
+		transition: all 0.2s;
+		font-size: 0.9rem;
+	}
+
+	.toggle-btn.active {
+		background-color: var(--accent-color);
+		color: white;
+	}
+
+	.toggle-btn:hover:not(.active) {
+		color: var(--text-primary);
+	}
+
+	.media-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		gap: 1.5rem;
 	}
 </style>
