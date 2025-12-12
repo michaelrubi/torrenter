@@ -5,7 +5,7 @@
 	import { searchTorrents, getDiscoveryContent } from './data.remote';
 	import type { DiscoveryItem } from '$lib/types';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let searchTerm = $state('');
 	let results: any[] = $state([]);
@@ -19,9 +19,9 @@
 
 	$effect(() => {
 		// Read the URL query parameter
-		const q = $page.url.searchParams.get('q') || '';
+		const q = page.url.searchParams.get('search') || '';
 
-		console.log('Effect triggered. URL q:', q, 'Last q:', lastQuery);
+		console.log('Effect triggered. URL search:', q, 'Last q:', lastQuery);
 
 		// If URL query changed (or on initial load)
 		if (q !== lastQuery) {
@@ -46,7 +46,7 @@
 	// This effect runs when mediaType changes
 	$effect(() => {
 		// We only care about mediaType changes if we are NOT searching
-		const q = $page.url.searchParams.get('q');
+		const q = page.url.searchParams.get('search');
 		if (!q && !loading) {
 			console.log('MediaType changed or init discovery. Type:', mediaType);
 			loadDiscovery();
@@ -95,7 +95,7 @@
 		e.preventDefault();
 		const trimmed = searchTerm.trim();
 		// Always navigate. If empty, go to root.
-		goto(`/?q=${encodeURIComponent(trimmed)}`, { keepFocus: true });
+		goto(`/?search=${encodeURIComponent(trimmed)}`, { keepFocus: true });
 	}
 </script>
 
