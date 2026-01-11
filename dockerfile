@@ -1,5 +1,5 @@
 # 1. Build Stage
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ RUN npm run build
 RUN npm prune --production
 
 # 2. Run Stage
-FROM node:22-alpine
+FROM node:25-alpine
 WORKDIR /app
 # Copy built artifacts and production deps
 COPY --from=builder /app/build build/
