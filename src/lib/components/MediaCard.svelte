@@ -9,124 +9,86 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="media-card" onclick={onClick}>
-	<div class="poster-wrapper">
+<div class="poster-card" onclick={onClick} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && onClick?.()}>
+	<div class="img-wrap">
 		{#if posterUrl}
-			<img src={posterUrl} alt={title} class="poster-image" loading="lazy" />
+			<img src={posterUrl} alt={title} loading="lazy" />
 		{:else}
-			<div class="poster-placeholder">
-				<span>No Image</span>
-			</div>
+			<div class="no-img">No Image</div>
 		{/if}
-		<div class="overlay">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="48"
-				height="48"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="search-icon"
-			>
-				<circle cx="11" cy="11" r="8" />
-				<path d="m21 21-4.3-4.3" />
-			</svg>
-		</div>
 	</div>
-	<div class="info">
-		<h3 class="title" {title}>{title}</h3>
-		<span class="year">{year}</span>
-	</div>
+	<div class="card-title">{title}</div>
+	<div class="card-meta">{year}</div>
 </div>
 
 <style>
-	.media-card {
-		position: relative;
-		width: 100%;
+	.poster-card {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: var(--gap-sm);
 		cursor: pointer;
-		transition: transform 0.2s ease;
+		transition: border-color 0.15s;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
 	}
 
-	.media-card:hover {
-		transform: translateY(-4px);
+	.poster-card:hover {
+		border-color: var(--muted);
 	}
 
-	.poster-wrapper {
+	.poster-card:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.img-wrap {
 		position: relative;
 		width: 100%;
-		aspect-ratio: 2/3;
-		border-radius: 12px;
+		aspect-ratio: 3 / 4;
 		overflow: hidden;
-		background-color: var(--surface-color);
-		box-shadow:
-			0 4px 6px -1px rgba(0, 0, 0, 0.1),
-			0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+		background: var(--surface-2);
+		flex-shrink: 0;
 	}
 
-	.poster-image {
+	.img-wrap img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		transition: transform 0.3s ease;
+		display: block;
 	}
 
-	.media-card:hover .poster-image {
-		transform: scale(1.05);
-	}
-
-	.poster-placeholder {
+	.no-img {
 		width: 100%;
 		height: 100%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: var(--surface-color);
-		color: var(--text-secondary);
-		font-size: 0.9rem;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--muted);
+		text-transform: uppercase;
 	}
 
-	.overlay {
-		position: absolute;
-		inset: 0;
-		background-color: rgba(0, 0, 0, 0.4);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		opacity: 0;
-		transition: opacity 0.2s ease;
-	}
-
-	.media-card:hover .overlay {
-		opacity: 1;
-	}
-
-	.search-icon {
-		color: white;
-		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-	}
-
-	.info {
-		padding: 0 0.25rem;
-	}
-
-	.title {
-		font-size: 0.95rem;
+	.card-title {
+		font-family: var(--font-body);
+		font-size: 14px;
 		font-weight: 500;
-		color: var(--text-primary);
-		margin: 0;
-		white-space: nowrap;
+		color: var(--fg);
+		margin-top: var(--gap-sm);
+		line-height: 1.3;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
-	.year {
-		font-size: 0.85rem;
-		color: var(--text-secondary);
+	.card-meta {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--muted);
+		margin-top: auto;
+		padding-top: 2px;
 	}
 </style>

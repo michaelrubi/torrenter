@@ -7,6 +7,9 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </svelte:head>
 
 <header class="main-header">
@@ -23,18 +26,18 @@
 <style>
 	.main-header {
 		width: 100%;
-		border-bottom: 1px solid var(--border-color);
-		background-color: rgba(23, 23, 23, 0.8);
-		backdrop-filter: blur(8px);
+		border-bottom: 1px solid var(--border);
+		background: var(--bg);
 		position: sticky;
 		top: 0;
-		z-index: 50;
+		z-index: 100;
 	}
 
 	.header-content {
-		max-width: 1200px;
+		max-width: 1280px;
 		margin: 0 auto;
-		padding: 1rem 2rem;
+		padding: 0 var(--gap-lg);
+		height: 56px;
 		display: flex;
 		align-items: center;
 	}
@@ -42,10 +45,10 @@
 	.logo-link {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: var(--gap-sm);
 		text-decoration: none;
-		color: var(--text-primary);
-		transition: opacity 0.2s;
+		color: var(--fg);
+		transition: opacity 0.15s;
 	}
 
 	.logo-link:hover {
@@ -53,13 +56,14 @@
 	}
 
 	.logo-icon {
-		width: 32px;
-		height: 32px;
+		width: 28px;
+		height: 28px;
 	}
 
 	.logo-text {
+		font-family: var(--font-display);
 		font-weight: 700;
-		font-size: 1.25rem;
-		letter-spacing: -0.025em;
+		font-size: 18px;
+		letter-spacing: -0.02em;
 	}
 </style>

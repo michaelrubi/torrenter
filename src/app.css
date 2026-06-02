@@ -1,13 +1,30 @@
 :root {
-  --bg-color: #0f0f11;
-  --surface-color: #1c1c1f;
-  --text-primary: #f2f2f2;
-  --text-secondary: #a1a1aa;
-  --accent-color: #8b5cf6;
-  --accent-hover: #7c3aed;
-  --border-color: #27272a;
-  --input-bg: #27272a;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --bg:          #080B0F;
+  --surface:     #0E1218;
+  --surface-2:   #151B24;
+  --fg:           #E2E8F0;
+  --muted:        #5A6878;
+  --border:       #1E2530;
+  --accent:       #00D4B8;
+  --accent-dim:   #00D4B820;
+  --seed:         #3DDC97;
+  --peer:         #FF6B6B;
+  --gold:         #FFD166;
+  --font-display: 'Syne', 'Inter', sans-serif;
+  --font-body:    'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --fs-h2:        22px;
+  --fs-body:      14px;
+  --fs-data:      13px;
+  --fs-chip:      12px;
+  --gap-xs:       4px;
+  --gap-sm:       8px;
+  --gap-md:       16px;
+  --gap-lg:       24px;
+  --gap-xl:       40px;
+  --radius-sm:    4px;
+  --radius-md:    8px;
+  --radius-lg:    12px;
 }
 
 * {
@@ -17,18 +34,18 @@
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-  font-family: var(--font-family);
-  line-height: 1.6;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 1.5;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--fg);
 }
 
 input, button {
@@ -38,10 +55,9 @@ input, button {
 
 /* Utilities */
 .container {
-  max-width: 800px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
-  width: 100%;
+  padding: 0 var(--gap-lg);
 }
 
 .center-content {
@@ -49,6 +65,12 @@ input, button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 80vh; /* Keep it vertically centered but slightly up */
+  min-height: 80vh;
   text-align: center;
+}
+
+/* Focus ring — keyboard only */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

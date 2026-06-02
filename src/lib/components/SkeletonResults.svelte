@@ -1,31 +1,31 @@
-<div class="table-container">
+<div class="table-wrap">
 	<table>
 		<thead>
 			<tr>
-				<th class="title">Title</th>
-				<th class="size">Size</th>
-				<th class="seeds right">Seeds</th>
-				<th class="peers right">Peers</th>
-				<th class="date right">Age</th>
+				<th>Title</th>
+				<th>Size</th>
+				<th class="right">Seeds</th>
+				<th class="right">Peers</th>
+				<th class="right">Age</th>
 			</tr>
 		</thead>
 		<tbody>
-			{#each Array(10) as _}
+			{#each Array(8) as _}
 				<tr>
-					<td class="title">
-						<div class="skeleton-text title-skeleton"></div>
+					<td>
+						<div class="skeleton-line w-80"></div>
 					</td>
-					<td class="size">
-						<div class="skeleton-text size-skeleton"></div>
+					<td>
+						<div class="skeleton-line w-40"></div>
 					</td>
-					<td class="seeds right">
-						<div class="skeleton-text number-skeleton"></div>
+					<td class="right">
+						<div class="skeleton-line w-24"></div>
 					</td>
-					<td class="peers right">
-						<div class="skeleton-text number-skeleton"></div>
+					<td class="right">
+						<div class="skeleton-line w-24"></div>
 					</td>
-					<td class="date right">
-						<div class="skeleton-text date-skeleton"></div>
+					<td class="right">
+						<div class="skeleton-line w-48"></div>
 					</td>
 				</tr>
 			{/each}
@@ -34,78 +34,75 @@
 </div>
 
 <style>
-	.table-container {
-		width: 100%;
+	@keyframes shimmer {
+		0%   { background-position: -400px 0; }
+		100% { background-position: 400px 0; }
+	}
+
+	.table-wrap {
 		overflow-x: auto;
-		margin-top: 2rem;
-		border: 1px solid var(--border-color);
-		border-radius: 8px;
-		background-color: var(--surface-color);
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
 	}
 
 	table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.9rem;
+		font-family: var(--font-body);
+		font-size: var(--fs-body);
 	}
 
-	th,
-	td {
-		padding: 1rem;
-		text-align: left;
-		border-bottom: 1px solid var(--border-color);
+	thead {
+		background: var(--surface-2);
+		border-bottom: 1px solid var(--border);
 	}
 
 	th {
-		background-color: rgba(255, 255, 255, 0.03);
-		color: var(--text-secondary);
-		font-weight: 600;
-		font-size: 0.8rem;
+		text-align: left;
+		padding: 10px 14px;
+		font-family: var(--font-mono);
+		font-size: 11px;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.06em;
+		color: var(--muted);
+		font-weight: 500;
+		white-space: nowrap;
 	}
+
+	td {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		vertical-align: middle;
+	}
+
+	tr:last-child td {
+		border-bottom: none;
+	}
+
+	tr {
+		background: var(--surface);
+	}
+
+	.skeleton-line {
+		height: 12px;
+		border-radius: 3px;
+		background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+		background-size: 800px 100%;
+		animation: shimmer 1.4s infinite linear;
+	}
+
+	.skeleton-line.w-80 { width: 80%; }
+	.skeleton-line.w-48 { width: 48px; }
+	.skeleton-line.w-40 { width: 40px; }
+	.skeleton-line.w-24 { width: 24px; }
 
 	.right {
 		text-align: right;
 	}
 
-	.right .skeleton-text {
-		margin-left: auto;
-	}
-
-	/* Skeleton Styles */
-	.skeleton-text {
-		height: 1em;
-		background-color: rgba(255, 255, 255, 0.05);
-		border-radius: 4px;
-		animation: pulse 1.5s infinite ease-in-out;
-	}
-
-	.title-skeleton {
-		width: 60%;
-	}
-
-	.size-skeleton {
-		width: 60px;
-	}
-
-	.number-skeleton {
-		width: 30px;
-	}
-
-	.date-skeleton {
-		width: 80px;
-	}
-
-	@keyframes pulse {
-		0% {
-			opacity: 0.4;
-		}
-		50% {
-			opacity: 0.8;
-		}
-		100% {
-			opacity: 0.4;
+	@media (prefers-reduced-motion: reduce) {
+		.skeleton-line {
+			animation: none;
 		}
 	}
 </style>
