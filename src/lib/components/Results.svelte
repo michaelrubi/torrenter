@@ -17,7 +17,6 @@
 	});
 	let isFilterMenuOpen = $state(false);
 	let currentPage = $state(1);
-	let copiedMagnet = $state<string | null>(null);
 	const itemsPerPage = 20;
 
 	function timeAgo(dateString: string) {
@@ -36,18 +35,6 @@
 		interval = seconds / 60;
 		if (interval > 1) return Math.floor(interval) + ' minutes ago';
 		return Math.floor(seconds) + ' seconds ago';
-	}
-
-	async function copyToClipboard(text: string) {
-		try {
-			await navigator.clipboard.writeText(text);
-			copiedMagnet = text;
-			setTimeout(() => {
-				copiedMagnet = null;
-			}, 2000);
-		} catch (err) {
-			console.error('Failed to copy:', err);
-		}
 	}
 
 	function toggleSort(column: string) {
@@ -363,19 +350,15 @@
 					<td class="col-title">
 						<div class="title-main">
 							{#if result.magnet}
-								<button
-									class="magnet-btn {copiedMagnet === result.magnet ? 'copied' : ''}"
-									onclick={() => copyToClipboard(result.magnet)}
-								>
-									{#if copiedMagnet === result.magnet}
-										<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-										Copied
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-										Magnet
-									{/if}
-								</button>
-							{/if}
+														<a
+															class="magnet-btn"
+															href={result.magnet}
+															title="Open in torrent client"
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+															Magnet
+														</a>
+													{/if}
 							<span class="title-text">{result.title}</span>
 						</div>
 					</td>
