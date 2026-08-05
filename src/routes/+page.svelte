@@ -2,8 +2,9 @@
 	import Results from '$lib/components/Results.svelte';
 	import SkeletonResults from '$lib/components/SkeletonResults.svelte';
 	import MediaCard from '$lib/components/MediaCard.svelte';
-	import { searchTorrents, getDiscoveryContent } from './data.remote';
-	import type { DiscoveryItem } from '$lib/types';
+	import MediaModal from '$lib/components/MediaModal.svelte';
+	import { searchTorrents, getDiscoveryContent, getMediaDetails } from './data.remote';
+	import type { DiscoveryItem, MediaDetails } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
@@ -13,6 +14,10 @@
 	let loading = $state(false);
 	let hasSearched = $state(false);
 	let mediaType: 'movie' | 'tv' = $state('movie');
+
+	let selectedMedia: MediaDetails | null = $state(null);
+	let isModalOpen = $state(false);
+	let modalLoading = $state(false);
 
 	let formElement: HTMLFormElement;
 	let lastQuery = '';
@@ -74,6 +79,25 @@
 		const trimmed = searchTerm.trim();
 		goto(`/?search=${encodeURIComponent(trimmed)}`, { keepFocus: true });
 	}
+
+	async function openDetails(item: DiscoveryItem) {
+		isModalOpen = true;
+		modalLoading = true;
+		selectedMedia = null;
+		try {
+			const details = await getMediaDetails({ id: item.id, mediaType: item.mediaType || mediaType });
+			selectedMedia = details;
+		} catch (err) {
+			console.error('Failed to get media details:', err);
+		} finally {
+			modalLoading = false;
+		}
+	}
+
+	function triggerDirectSearch(title: string) {
+		searchTerm = title;
+		goto(`/?search=${encodeURIComponent(title)}`, { keepFocus: true });
+	}
 </script>
 
 <div class="page-body">
@@ -86,24 +110,36 @@
 					<input
 						type="text"
 						bind:value={searchTerm}
-						placeholder="Search movies or TV shows…"
+						placeholder="Search movies or TV shows (e.g. Inception, Dune 4K, S01)..."
 						class="search-input"
 						aria-label="Search"
 					/>
+					{#if searchTerm}
+						<button type="button" class="clear-search-btn" onclick={resetSearch} aria-label="Clear search">
+							×
+						</button>
+					{/if}
 					<button type="submit" class="search-btn" disabled={loading}>Search</button>
 				</div>
 			</form>
 
-			<!-- Segmented control -->
-			<div class="segmented">
-				<button
-					class="seg-btn {mediaType === 'movie' ? 'active' : ''}"
-					onclick={() => (mediaType = 'movie')}
-				>Movies</button>
-				<button
-					class="seg-btn {mediaType === 'tv' ? 'active' : ''}"
-					onclick={() => (mediaType = 'tv')}
-				>TV Shows</button>
+			<!-- Segmented control & discovery toggle -->
+			<div class="controls-row">
+				<div class="segmented">
+					<button
+						class="seg-btn {mediaType === 'movie' ? 'active' : ''}"
+						onclick={() => { mediaType = 'movie'; loadDiscovery(); }}
+					>Movies</button>
+					<button
+						class="seg-btn {mediaType === 'tv' ? 'active' : ''}"
+						onclick={() => { mediaType = 'tv'; loadDiscovery(); }}
+					>TV Shows</button>
+				</div>
+				{#if hasSearched}
+					<button class="back-home-btn" onclick={resetSearch}>
+						← Popular Discoveries
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -115,24 +151,26 @@
 		{:else if hasSearched && results.length === 0}
 			<div class="empty-state">
 				<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
-				<h3>No results found</h3>
-				<p>Try adjusting your search terms</p>
+				<h3>No torrent results found</h3>
+				<p>Try adjusting your search terms or checking different trackers</p>
 			</div>
 		{:else if hasSearched && results.length > 0}
 			<Results {results} />
 		{:else if !hasSearched && !searchTerm}
 			<div class="discovery-section">
-				<p class="section-label">Popular {mediaType === 'movie' ? 'Movies' : 'TV Shows'}</p>
+				<div class="discovery-header">
+					<p class="section-label">Popular {mediaType === 'movie' ? 'Movies' : 'TV Shows'}</p>
+					<span class="section-subtitle">Click any card to view IMDb ratings, plot details & trailer</span>
+				</div>
 				<div class="grid">
 					{#each discoveryResults as item (item.id)}
 						<MediaCard
 							title={item.title}
 							posterUrl={item.posterPath}
-							year={new Date(item.releaseDate).getFullYear().toString()}
-							onClick={() => {
-								searchTerm = item.title;
-								setTimeout(() => formElement?.requestSubmit(), 0);
-							}}
+							year={item.releaseDate ? new Date(item.releaseDate).getFullYear().toString() : ''}
+							voteAverage={item.voteAverage}
+							onClick={() => openDetails(item)}
+							onSearchClick={() => triggerDirectSearch(item.title)}
 						/>
 					{/each}
 				</div>
@@ -140,6 +178,15 @@
 		{/if}
 	</div>
 </div>
+
+{#if isModalOpen}
+	<MediaModal
+		details={selectedMedia}
+		loading={modalLoading}
+		onClose={() => (isModalOpen = false)}
+		onSearch={(t) => triggerDirectSearch(t)}
+	/>
+{/if}
 
 <style>
 	.page-body {
@@ -200,6 +247,19 @@
 		color: var(--muted);
 	}
 
+	.clear-search-btn {
+		background: none;
+		border: none;
+		color: var(--muted);
+		font-size: 18px;
+		cursor: pointer;
+		padding: 0 4px;
+	}
+
+	.clear-search-btn:hover {
+		color: var(--fg);
+	}
+
 	.search-btn {
 		background: var(--accent);
 		color: #080B0F;
@@ -220,6 +280,13 @@
 	.search-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.controls-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--gap-sm);
 	}
 
 	/* Segmented control */
@@ -253,6 +320,16 @@
 		color: var(--fg);
 	}
 
+	.back-home-btn {
+		background: none;
+		border: none;
+		color: var(--accent);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		cursor: pointer;
+		text-decoration: underline;
+	}
+
 	/* Content */
 	.content-section {
 		padding-bottom: var(--gap-xl);
@@ -263,13 +340,29 @@
 		width: 100%;
 	}
 
+	.discovery-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin-bottom: var(--gap-md);
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
 	.section-label {
 		font-family: var(--font-mono);
-		font-size: 11px;
+		font-size: 12px;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
+		color: var(--fg);
+		font-weight: 600;
+		margin: 0;
+	}
+
+	.section-subtitle {
+		font-family: var(--font-mono);
+		font-size: 11px;
 		color: var(--muted);
-		margin-bottom: var(--gap-md);
 	}
 
 	.grid {

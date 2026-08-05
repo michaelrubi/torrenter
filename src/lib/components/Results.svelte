@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Torrent } from '$lib/types';
-	import { fade, scale } from 'svelte/transition';
-	import { extractTags, type TagCategory } from '$lib/utils/title-parser';
+	import { fade } from 'svelte/transition';
+	import { extractTags, getQualityTier, type TagCategory } from '$lib/utils/title-parser';
 
 	let { results }: { results: Torrent[] } = $props();
 
@@ -13,28 +13,31 @@
 		Source: new Set(),
 		Codec: new Set(),
 		Audio: new Set(),
+		Season: new Set(),
 		Other: new Set()
 	});
 	let isFilterMenuOpen = $state(false);
 	let currentPage = $state(1);
-	const itemsPerPage = 20;
+	let copiedMagnet = $state<string | null>(null);
+	const itemsPerPage = 25;
 
 	function timeAgo(dateString: string) {
+		if (!dateString) return 'unknown';
 		const date = new Date(dateString);
 		const now = new Date();
 		const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
 		let interval = seconds / 31536000;
-		if (interval > 1) return Math.floor(interval) + ' years ago';
+		if (interval > 1) return Math.floor(interval) + 'y ago';
 		interval = seconds / 2592000;
-		if (interval > 1) return Math.floor(interval) + ' months ago';
+		if (interval > 1) return Math.floor(interval) + 'mo ago';
 		interval = seconds / 86400;
-		if (interval > 1) return Math.floor(interval) + ' days ago';
+		if (interval > 1) return Math.floor(interval) + 'd ago';
 		interval = seconds / 3600;
-		if (interval > 1) return Math.floor(interval) + ' hours ago';
+		if (interval > 1) return Math.floor(interval) + 'h ago';
 		interval = seconds / 60;
-		if (interval > 1) return Math.floor(interval) + ' minutes ago';
-		return Math.floor(seconds) + ' seconds ago';
+		if (interval > 1) return Math.floor(interval) + 'm ago';
+		return Math.floor(seconds) + 's ago';
 	}
 
 	function toggleSort(column: string) {
@@ -67,6 +70,7 @@
 			Source: new Set(),
 			Codec: new Set(),
 			Audio: new Set(),
+			Season: new Set(),
 			Other: new Set()
 		};
 
@@ -82,6 +86,7 @@
 			Source: Array.from(tags.Source).sort(),
 			Codec: Array.from(tags.Codec).sort(),
 			Audio: Array.from(tags.Audio).sort(),
+			Season: Array.from(tags.Season).sort(),
 			Other: Array.from(tags.Other).sort()
 		};
 	});
@@ -121,9 +126,13 @@
 
 	let sortedResults = $derived(
 		[...filteredResults].sort((a, b) => {
-			let valA, valB;
+			let valA: any, valB: any;
 
 			switch (sortColumn) {
+				case 'quality':
+					valA = getQualityTier(a.title).score;
+					valB = getQualityTier(b.title).score;
+					break;
 				case 'size':
 					valA = a.sizeBytes;
 					valB = b.sizeBytes;
@@ -166,9 +175,22 @@
 			Source: new Set(),
 			Codec: new Set(),
 			Audio: new Set(),
+			Season: new Set(),
 			Other: new Set()
 		};
 		currentPage = 1;
+	}
+
+	async function copyToClipboard(text: string) {
+		try {
+			await navigator.clipboard.writeText(text);
+			copiedMagnet = text;
+			setTimeout(() => {
+				if (copiedMagnet === text) copiedMagnet = null;
+			}, 2000);
+		} catch (e) {
+			console.error('Failed to copy magnet link:', e);
+		}
 	}
 </script>
 
@@ -186,6 +208,7 @@
 		{#if activeFilterCount > 0}
 			<span class="filter-badge">{activeFilterCount}</span>
 		{/if}
+		Categories
 		{#if isFilterMenuOpen}
 			<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
 		{/if}
@@ -195,7 +218,7 @@
 		<svg class="filter-search-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 		<input
 			type="text"
-			placeholder="Filter results…"
+			placeholder="Filter title results…"
 			bind:value={filterQuery}
 			class="filter-input"
 		/>
@@ -223,20 +246,26 @@
 				</button>
 			{/each}
 		{/each}
-		<button class="clear-all-btn" onclick={clearAllFilters}>Clear all</button>
+		<button class="clear-all-btn" onclick={clearAllFilters}>
+			<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+			Clear all
+		</button>
 	</div>
 {/if}
 
 <!-- Filter panel -->
 {#if isFilterMenuOpen}
-	<div class="filter-panel">
+	<div class="filter-panel" transition:fade={{ duration: 120 }}>
 		<div class="filter-panel-inner">
 			<div class="fp-header">
 				<span class="fp-title">Filter Results</span>
 				<div class="fp-header-actions">
 					<span class="fp-count"><strong>{activeFilterCount}</strong> active</span>
 					{#if activeFilterCount > 0}
-						<button class="fp-clear" onclick={clearAllFilters}>Clear all</button>
+						<button class="fp-clear" onclick={clearAllFilters}>
+							<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+							Clear all
+						</button>
 					{/if}
 					<button class="fp-close" onclick={() => (isFilterMenuOpen = false)} aria-label="Close">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -272,15 +301,29 @@
 	<table>
 		<thead>
 			<tr>
+				<th onclick={() => toggleSort('quality')} class="sortable col-quality">
+					<div class="th-content">
+						Quality
+						{#if sortColumn === 'quality'}
+							<span class="sort-icon">
+								{#if sortDirection === 'asc'}
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+								{/if}
+							</span>
+						{/if}
+					</div>
+				</th>
 				<th onclick={() => toggleSort('title')} class="sortable">
 					<div class="th-content">
-						Title
+						Release Title
 						{#if sortColumn === 'title'}
 							<span class="sort-icon">
 								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 								{/if}
 							</span>
 						{/if}
@@ -292,9 +335,9 @@
 						{#if sortColumn === 'size'}
 							<span class="sort-icon">
 								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 								{/if}
 							</span>
 						{/if}
@@ -306,9 +349,9 @@
 						{#if sortColumn === 'seeds'}
 							<span class="sort-icon">
 								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 								{/if}
 							</span>
 						{/if}
@@ -320,9 +363,9 @@
 						{#if sortColumn === 'peers'}
 							<span class="sort-icon">
 								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 								{/if}
 							</span>
 						{/if}
@@ -334,9 +377,9 @@
 						{#if sortColumn === 'date'}
 							<span class="sort-icon">
 								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 								{/if}
 							</span>
 						{/if}
@@ -346,28 +389,55 @@
 		</thead>
 		<tbody>
 			{#each paginatedResults as result (result.magnet || result.title)}
-				<tr transition:fade={{ duration: 200 }}>
+				{@const qInfo = getQualityTier(result.title)}
+				<tr transition:fade={{ duration: 150 }}>
+					<td class="col-quality">
+						<span class="q-badge {qInfo.badgeColor}" title={`Quality score: ${qInfo.score}`}>
+							{#if qInfo.badgeColor === 'gold'}
+								👑 {qInfo.tier}
+							{:else if qInfo.badgeColor === 'blue'}
+								💎 {qInfo.tier}
+							{:else if qInfo.badgeColor === 'green'}
+								⚡ {qInfo.tier}
+							{:else}
+								⚠️ {qInfo.tier}
+							{/if}
+						</span>
+					</td>
 					<td class="col-title">
 						<div class="title-main">
-							{#if result.magnet}
-														<a
-															class="magnet-btn"
-															href={result.magnet}
-															title="Open in torrent client"
-														>
-															<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-															Magnet
-														</a>
-													{/if}
-							<span class="title-text">{result.title}</span>
+							<div class="actions-group">
+								{#if result.magnet}
+									<a
+										class="magnet-btn"
+										href={result.magnet}
+										title="Open Magnet Link"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+										Magnet
+									</a>
+									<button
+										class="copy-btn {copiedMagnet === result.magnet ? 'copied' : ''}"
+										onclick={() => copyToClipboard(result.magnet)}
+										title="Copy Magnet Link"
+									>
+										{#if copiedMagnet === result.magnet}
+											✓
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+										{/if}
+									</button>
+								{/if}
+							</div>
+							<span class="title-text" title={result.title}>{result.title}</span>
 						</div>
 					</td>
 					<td class="col-size">{result.size}</td>
 					<td class="right col-seeds">
-						<span class="seed-val">{result.seeds}</span>
+						<span class="seed-val" class:zero={result.seeds === 0}>{result.seeds}</span>
 					</td>
 					<td class="right col-peers">
-						<span class="peer-val" class:low={result.peers < 10}>{result.peers}</span>
+						<span class="peer-val" class:low={result.peers < 5}>{result.peers}</span>
 					</td>
 					<td class="right col-age">{timeAgo(result.publishDate)}</td>
 				</tr>
@@ -397,7 +467,6 @@
 {/if}
 
 <style>
-	/* Filter row */
 	.filter-row {
 		display: flex;
 		align-items: center;
@@ -445,162 +514,133 @@
 		color: var(--accent);
 	}
 
-	.chevron {
-		transition: transform 0.2s ease;
-	}
-
-	.filter-chip.open .chevron {
-		transform: rotate(180deg);
-	}
-
 	.filter-badge {
 		background: var(--accent);
-		color: #080B0F;
-		border-radius: 999px;
-		min-width: 18px;
-		height: 18px;
-		font-size: 10px;
-		font-weight: 700;
-		display: flex;
+		color: #080b0f;
+		border-radius: 50%;
+		width: 16px;
+		height: 16px;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0 5px;
+		font-size: 10px;
+		font-weight: 700;
 	}
 
 	.filter-input-wrapper {
 		position: relative;
-		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: var(--gap-sm);
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 7px 10px;
-		transition: border-color 0.15s;
-		min-width: 200px;
-	}
-
-	.filter-input-wrapper:focus-within {
-		border-color: var(--accent);
+		margin-left: auto;
 	}
 
 	.filter-search-icon {
+		position: absolute;
+		left: 10px;
 		color: var(--muted);
-		flex-shrink: 0;
+		pointer-events: none;
 	}
 
 	.filter-input {
-		background: none;
-		border: none;
-		outline: none;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 5px 28px;
 		font-family: var(--font-mono);
 		font-size: 12px;
 		color: var(--fg);
-		width: 100%;
+		outline: none;
+		width: 200px;
+		transition: border-color 0.15s;
 	}
 
-	.filter-input::placeholder {
-		color: var(--muted);
+	.filter-input:focus {
+		border-color: var(--accent);
 	}
 
 	.filter-input-clear {
+		position: absolute;
+		right: 8px;
 		background: none;
 		border: none;
 		color: var(--muted);
 		cursor: pointer;
-		padding: 0;
-		display: flex;
-		align-items: center;
 		font-size: 14px;
-		font-family: var(--font-mono);
-		transition: color 0.15s;
-	}
-
-	.filter-input-clear:hover {
-		color: var(--fg);
 	}
 
 	.results-count {
 		font-family: var(--font-mono);
 		font-size: 12px;
 		color: var(--muted);
-		white-space: nowrap;
 	}
 
-	/* Active filters */
 	.active-filters-bar {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-		margin-bottom: var(--gap-md);
 		align-items: center;
+		margin-bottom: var(--gap-md);
 	}
 
 	.active-filter-chip {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		background: var(--accent-dim);
-		border: 1px solid var(--accent);
-		color: var(--accent);
-		padding: 4px 10px;
-		border-radius: 6px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 3px 8px;
 		font-family: var(--font-mono);
 		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
+		color: var(--fg);
+		display: flex;
+		align-items: center;
+		gap: 4px;
 		cursor: pointer;
-		transition: all 0.15s;
 	}
 
 	.active-filter-chip:hover {
-		background: color-mix(in srgb, var(--accent) 25%, transparent);
+		border-color: var(--accent);
 	}
 
-	.clear-all-btn {
-		background: none;
-		border: none;
+	.clear-all-btn,
+	.fp-clear {
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid var(--border);
+		border-radius: 4px;
 		color: var(--muted);
 		font-family: var(--font-mono);
 		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		padding: 3px 8px;
 		cursor: pointer;
-		padding: 4px 8px;
-		border-radius: var(--radius-sm);
-		transition: color 0.15s;
+		transition: all 0.15s ease;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 	}
 
-	.clear-all-btn:hover {
-		color: var(--fg);
+	.clear-all-btn:hover,
+	.fp-clear:hover {
+		background: rgba(243, 107, 107, 0.15);
+		border-color: rgba(243, 107, 107, 0.4);
+		color: #F36B6B;
 	}
 
-	/* Filter panel */
 	.filter-panel {
-		margin-bottom: var(--gap-md);
-	}
-
-	.filter-panel-inner {
 		background: var(--surface);
 		border: 1px solid var(--border);
-		border-top: none;
-		border-radius: 0 0 var(--radius-md) var(--radius-md);
-		padding: var(--gap-md);
+		border-radius: var(--radius-md);
+		padding: 16px;
+		margin-bottom: var(--gap-md);
 	}
 
 	.fp-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: var(--gap-md);
-		padding-bottom: var(--gap-md);
-		border-bottom: 1px solid var(--border);
+		margin-bottom: 12px;
 	}
 
 	.fp-title {
 		font-family: var(--font-display);
-		font-size: 15px;
+		font-size: 14px;
 		font-weight: 600;
 		color: var(--fg);
 	}
@@ -608,37 +648,10 @@
 	.fp-header-actions {
 		display: flex;
 		align-items: center;
-		gap: var(--gap-md);
-	}
-
-	.fp-count {
+		gap: 12px;
+		font-size: 12px;
 		font-family: var(--font-mono);
-		font-size: 11px;
 		color: var(--muted);
-	}
-
-	.fp-count strong {
-		color: var(--accent);
-		font-weight: 500;
-	}
-
-	.fp-clear {
-		background: none;
-		border: none;
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-		cursor: pointer;
-		padding: 4px 8px;
-		border-radius: var(--radius-sm);
-		transition: color 0.15s, background 0.15s;
-	}
-
-	.fp-clear:hover {
-		color: var(--fg);
-		background: var(--surface-2);
 	}
 
 	.fp-close {
@@ -646,40 +659,28 @@
 		border: none;
 		color: var(--muted);
 		cursor: pointer;
-		padding: 4px;
-		border-radius: var(--radius-sm);
 		display: flex;
 		align-items: center;
-		transition: color 0.15s;
-	}
-
-	.fp-close:hover {
-		color: var(--fg);
 	}
 
 	.fp-categories {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--gap-md);
-	}
-
-	@media (max-width: 600px) {
-		.fp-categories { grid-template-columns: 1fr; }
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
 	.fp-category {
 		display: flex;
 		flex-direction: column;
-		gap: var(--gap-xs);
+		gap: 6px;
 	}
 
 	.fp-cat-label {
 		font-family: var(--font-mono);
 		font-size: 10px;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.08em;
 		color: var(--muted);
-		margin-bottom: var(--gap-xs);
 	}
 
 	.fp-tags {
@@ -689,21 +690,18 @@
 	}
 
 	.fp-tag {
-		background: none;
+		background: var(--surface-2);
 		border: 1px solid var(--border);
-		border-radius: 5px;
+		border-radius: 4px;
+		padding: 4px 10px;
 		font-family: var(--font-mono);
 		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
 		color: var(--muted);
-		padding: 4px 9px;
 		cursor: pointer;
 		transition: all 0.15s;
-		user-select: none;
 	}
 
-	.fp-tag:hover:not(.active) {
+	.fp-tag:hover {
 		border-color: var(--muted);
 		color: var(--fg);
 	}
@@ -712,62 +710,59 @@
 		background: var(--accent-dim);
 		border-color: var(--accent);
 		color: var(--accent);
+		font-weight: 600;
 	}
 
-	/* Results table */
 	.table-wrap {
+		width: 100%;
 		overflow-x: auto;
-		border-radius: var(--radius-md);
 		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surface);
 	}
 
 	table {
 		width: 100%;
 		border-collapse: collapse;
-		font-family: var(--font-body);
-		font-size: var(--fs-body);
-	}
-
-	thead {
-		background: var(--surface-2);
-		border-bottom: 1px solid var(--border);
+		font-size: 13px;
+		text-align: left;
 	}
 
 	th {
-		text-align: left;
-		padding: 10px 14px;
+		background: var(--surface-2);
+		padding: 12px 14px;
 		font-family: var(--font-mono);
 		font-size: 11px;
+		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		letter-spacing: 0.05em;
 		color: var(--muted);
-		font-weight: 500;
-		white-space: nowrap;
-		cursor: pointer;
+		border-bottom: 1px solid var(--border);
 		user-select: none;
 	}
 
-	th:hover {
+	th.sortable {
+		cursor: pointer;
+	}
+
+	th.sortable:hover {
 		color: var(--fg);
 	}
 
-	.sort-icon {
-		opacity: 0.4;
-		margin-left: 4px;
-		vertical-align: middle;
-		display: inline-flex;
+	.th-content {
+		display: flex;
 		align-items: center;
+		gap: 4px;
 	}
 
-	:global(th.sorted) .sort-icon,
-	th:hover .sort-icon {
-		opacity: 1;
-		color: var(--accent);
+	.th-content.right {
+		justify-content: flex-end;
 	}
 
 	td {
-		padding: 10px 14px;
+		padding: 12px 14px;
 		border-bottom: 1px solid var(--border);
+		color: var(--fg);
 		vertical-align: middle;
 	}
 
@@ -775,113 +770,172 @@
 		border-bottom: none;
 	}
 
-	tr {
-		background: var(--surface);
-		transition: background 0.1s;
+	tr:hover td {
+		background: rgba(255, 255, 255, 0.02);
 	}
 
-	tr:hover {
-		background: var(--surface-2);
+	.col-quality {
+		white-space: nowrap;
+		width: 120px;
+	}
+
+	.q-badge {
+		display: inline-block;
+		padding: 2px 8px;
+		border-radius: 4px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.q-badge.gold {
+		background: rgba(245, 197, 24, 0.15);
+		color: #F5C518;
+		border: 1px solid rgba(245, 197, 24, 0.3);
+	}
+
+	.q-badge.blue {
+		background: rgba(59, 130, 246, 0.15);
+		color: #60A5FA;
+		border: 1px solid rgba(59, 130, 246, 0.3);
+	}
+
+	.q-badge.green {
+		background: rgba(16, 185, 129, 0.15);
+		color: #34D399;
+		border: 1px solid rgba(16, 185, 129, 0.3);
+	}
+
+	.q-badge.amber {
+		background: rgba(245, 158, 11, 0.15);
+		color: #FBBF24;
+		border: 1px solid rgba(245, 158, 11, 0.3);
 	}
 
 	.col-title {
-		max-width: 480px;
+		max-width: 500px;
 	}
 
 	.title-main {
-		font-weight: 500;
-		color: var(--fg);
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 10px;
+	}
+
+	.actions-group {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+
+	.magnet-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		background: var(--accent-dim);
+		color: var(--accent);
+		border: 1px solid var(--accent);
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+		text-decoration: none;
+		transition: all 0.15s;
+	}
+
+	.magnet-btn:hover {
+		background: var(--accent);
+		color: #080b0f;
+	}
+
+	.copy-btn {
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		color: var(--muted);
+		padding: 4px 6px;
+		border-radius: 4px;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.15s;
+	}
+
+	.copy-btn:hover {
+		color: var(--fg);
+		border-color: var(--muted);
+	}
+
+	.copy-btn.copied {
+		color: #34D399;
+		border-color: #34D399;
 	}
 
 	.title-text {
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
+		font-family: var(--font-mono);
+		font-size: 13px;
+		white-space: nowrap;
 		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.col-size,
-	.col-age {
+	.col-size {
+		white-space: nowrap;
 		font-family: var(--font-mono);
-		font-size: var(--fs-data);
+		font-size: 12px;
 		color: var(--muted);
-		white-space: nowrap;
 	}
 
-	.col-seeds,
-	.col-peers {
-		font-family: var(--font-mono);
-		font-size: var(--fs-data);
-		white-space: nowrap;
+	.right {
+		text-align: right;
 	}
 
 	.seed-val {
-		color: var(--seed);
-		font-weight: 500;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		color: #34D399;
+	}
+
+	.seed-val.zero {
+		color: var(--muted);
 	}
 
 	.peer-val {
-		color: var(--peer);
+		font-family: var(--font-mono);
+		color: var(--fg);
 	}
 
 	.peer-val.low {
 		color: var(--muted);
 	}
 
-	/* Magnet button */
-	.magnet-btn {
-		background: none;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		color: var(--muted);
-		padding: 5px 10px;
-		cursor: pointer;
+	.col-age {
+		white-space: nowrap;
 		font-family: var(--font-mono);
 		font-size: 11px;
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		transition: all 0.15s;
-		white-space: nowrap;
-		flex-shrink: 0;
+		color: var(--muted);
 	}
 
-	.magnet-btn:hover {
-		border-color: var(--accent);
-		color: var(--accent);
-		background: var(--accent-dim);
-	}
-
-	.magnet-btn.copied {
-		border-color: var(--seed);
-		color: var(--seed);
-		background: color-mix(in srgb, var(--seed) 12%, transparent);
-	}
-
-	/* Pagination */
 	.pagination {
 		display: flex;
-		justify-content: center;
 		align-items: center;
-		gap: var(--gap-md);
-		margin-top: var(--gap-md);
-		padding-bottom: var(--gap-xl);
+		justify-content: center;
+		gap: 16px;
+		margin-top: 20px;
 	}
 
 	.pagination button {
-		background: none;
+		background: var(--surface);
 		border: 1px solid var(--border);
-		color: var(--muted);
+		color: var(--fg);
+		padding: 6px 14px;
+		border-radius: 6px;
 		font-family: var(--font-mono);
 		font-size: 12px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		padding: 8px 16px;
-		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition: all 0.15s;
 	}
@@ -900,9 +954,5 @@
 		font-family: var(--font-mono);
 		font-size: 12px;
 		color: var(--muted);
-	}
-
-	.right {
-		text-align: right;
 	}
 </style>
