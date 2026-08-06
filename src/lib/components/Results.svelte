@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Torrent } from '$lib/types';
 	import { fade } from 'svelte/transition';
+	import { MorphIcon } from 'morphicons/svelte';
+	import { Check, ChevronDown, ChevronUp, ChevronsUpDown, Copy } from 'lucide';
 	import { extractTags, getQualityTier, type TagCategory } from '$lib/utils/title-parser';
 
 	let { results }: { results: Torrent[] } = $props();
@@ -296,6 +298,20 @@
 	</div>
 {/if}
 
+<!-- Sort affordance: always present, dim when the column is inactive, so headers
+     never reflow. ChevronsUpDown → ChevronUp/Down morphs; asc ↔ desc is congruent
+     so morphicons resolves it as a rotation. -->
+{#snippet sortIcon(column: string)}
+	<span class="sort-icon" class:inactive={sortColumn !== column}>
+		<MorphIcon
+			icon={sortColumn !== column ? ChevronsUpDown : sortDirection === 'asc' ? ChevronUp : ChevronDown}
+			size={14}
+			strokeWidth={2}
+			reducedMotion="user"
+		/>
+	</span>
+{/snippet}
+
 <!-- Results table -->
 <div class="table-wrap">
 	<table>
@@ -304,85 +320,37 @@
 				<th onclick={() => toggleSort('quality')} class="sortable col-quality">
 					<div class="th-content">
 						Quality
-						{#if sortColumn === 'quality'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('quality')}
 					</div>
 				</th>
 				<th onclick={() => toggleSort('title')} class="sortable">
 					<div class="th-content">
 						Release Title
-						{#if sortColumn === 'title'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('title')}
 					</div>
 				</th>
 				<th onclick={() => toggleSort('size')} class="sortable col-size">
 					<div class="th-content">
 						Size
-						{#if sortColumn === 'size'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('size')}
 					</div>
 				</th>
 				<th onclick={() => toggleSort('seeds')} class="right sortable">
 					<div class="th-content right">
 						Seeds
-						{#if sortColumn === 'seeds'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('seeds')}
 					</div>
 				</th>
 				<th onclick={() => toggleSort('peers')} class="right sortable">
 					<div class="th-content right">
 						Peers
-						{#if sortColumn === 'peers'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('peers')}
 					</div>
 				</th>
 				<th onclick={() => toggleSort('date')} class="right sortable">
 					<div class="th-content right">
 						Age
-						{#if sortColumn === 'date'}
-							<span class="sort-icon">
-								{#if sortDirection === 'asc'}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
-								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-								{/if}
-							</span>
-						{/if}
+						{@render sortIcon('date')}
 					</div>
 				</th>
 			</tr>
@@ -421,11 +389,13 @@
 										onclick={() => copyToClipboard(result.magnet)}
 										title="Copy Magnet Link"
 									>
-										{#if copiedMagnet === result.magnet}
-											✓
-										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-										{/if}
+										<MorphIcon
+											icon={copiedMagnet === result.magnet ? Check : Copy}
+											size={12}
+											strokeWidth={2}
+											spring="snappy"
+											reducedMotion="user"
+										/>
 									</button>
 								{/if}
 							</div>
@@ -873,6 +843,19 @@
 	.copy-btn.copied {
 		color: #34D399;
 		border-color: #34D399;
+	}
+
+	.sort-icon {
+		display: inline-flex;
+		transition: opacity 0.15s;
+	}
+
+	.sort-icon.inactive {
+		opacity: 0.3;
+	}
+
+	.sortable:hover .sort-icon.inactive {
+		opacity: 0.6;
 	}
 
 	.title-text {

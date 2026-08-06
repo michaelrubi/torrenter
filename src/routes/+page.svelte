@@ -7,6 +7,8 @@
 	import type { DiscoveryItem, MediaDetails } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { MorphIcon } from 'morphicons/svelte';
+	import { Search, X } from 'lucide';
 
 	let searchTerm = $state('');
 	let results: any[] = $state([]);
@@ -106,7 +108,17 @@
 		<div class="search-wrapper">
 			<form bind:this={formElement} onsubmit={handleSearch} class="search-form">
 				<div class="search-input-row">
-					<svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+					<!-- Magnifier doubles as the clear button once there is text: one slot,
+					     one morph, no button popping in and out of the row. -->
+					<button
+						type="button"
+						class="search-icon-btn"
+						onclick={resetSearch}
+						disabled={!searchTerm}
+						aria-label="Clear search"
+					>
+						<MorphIcon icon={searchTerm ? X : Search} size={18} strokeWidth={2} reducedMotion="user" />
+					</button>
 					<input
 						type="text"
 						bind:value={searchTerm}
@@ -114,11 +126,6 @@
 						class="search-input"
 						aria-label="Search"
 					/>
-					{#if searchTerm}
-						<button type="button" class="clear-search-btn" onclick={resetSearch} aria-label="Clear search">
-							×
-						</button>
-					{/if}
 					<button type="submit" class="search-btn" disabled={loading}>Search</button>
 				</div>
 			</form>
@@ -227,9 +234,24 @@
 		box-shadow: 0 0 0 3px var(--accent-dim);
 	}
 
-	.search-icon {
+	.search-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		background: none;
+		border: none;
+		padding: 0;
 		color: var(--muted);
 		flex-shrink: 0;
+		cursor: pointer;
+		transition: color 0.15s;
+	}
+
+	.search-icon-btn:disabled {
+		cursor: default;
+	}
+
+	.search-icon-btn:hover:not(:disabled) {
+		color: var(--fg);
 	}
 
 	.search-input {
@@ -245,19 +267,6 @@
 
 	.search-input::placeholder {
 		color: var(--muted);
-	}
-
-	.clear-search-btn {
-		background: none;
-		border: none;
-		color: var(--muted);
-		font-size: 18px;
-		cursor: pointer;
-		padding: 0 4px;
-	}
-
-	.clear-search-btn:hover {
-		color: var(--fg);
 	}
 
 	.search-btn {
