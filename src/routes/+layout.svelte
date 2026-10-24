@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { resolve } from '$app/paths';
 
 	let { children } = $props();
 </script>
@@ -9,12 +10,15 @@
 	<link rel="icon" href={favicon} />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+		rel="stylesheet"
+	/>
 </svelte:head>
 
 <header class="main-header">
 	<div class="header-content">
-		<a href="/" class="logo-link">
+		<a href={resolve('/')} class="logo-link">
 			<img src={favicon} alt="Torrenter" class="logo-icon" />
 			<span class="logo-text">Torrenter</span>
 		</a>

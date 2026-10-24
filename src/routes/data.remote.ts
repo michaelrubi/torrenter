@@ -4,6 +4,30 @@ import * as v from 'valibot';
 
 import type { Torrent, DiscoveryItem, MediaDetails } from '$lib/types';
 
+interface JackettRawResult {
+	CategoryDesc?: string;
+	Title: string;
+	MagnetUri?: string;
+	Seeders?: number;
+	Peers?: number;
+	Size?: number;
+	PublishDate?: string;
+	Tracker?: string;
+}
+
+interface TmdbDiscoverRawItem {
+	id: number;
+	title?: string;
+	name?: string;
+	poster_path?: string;
+	backdrop_path?: string;
+	release_date?: string;
+	first_air_date?: string;
+	overview?: string;
+	vote_average?: number;
+	vote_count?: number;
+}
+
 export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 	if (!searchTerm) return [];
 
@@ -12,7 +36,7 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 
 	if (!apiKey || !jackettUrl) {
 		console.warn('JACKETT_API_KEY or JACKETT_URL not set');
-		return [];
+		throw new Error('Jackett indexer is not configured (missing JACKETT_URL or JACKETT_API_KEY)');
 	}
 
 	const limit = 1000;
@@ -28,10 +52,18 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 
 		const data = await response.json();
 
-		const results: Torrent[] = (data.Results || [])
-			.filter((result: any) => !result.CategoryDesc?.toLowerCase().includes('xxx'))
-			.map((result: any) => {
-				const { Title: title, MagnetUri: magnet, Seeders: seeds, Peers: peers, Size, PublishDate, Tracker: tracker } = result;
+		const results: Torrent[] = ((data.Results || []) as JackettRawResult[])
+			.filter((result) => !result.CategoryDesc?.toLowerCase().includes('xxx'))
+			.map((result) => {
+				const {
+					Title: title,
+					MagnetUri: magnet,
+					Seeders: seeds,
+					Peers: peers,
+					Size,
+					PublishDate,
+					Tracker: tracker
+				} = result;
 
 				const size = ((bytes = Size, decimals = 2) => {
 					if (!bytes || bytes === 0) return '0 Bytes';
@@ -91,20 +123,24 @@ export const getDiscoveryContent = query(
 
 			const data = await response.json();
 
-			return (data.results || []).map((item: any) => ({
-				id: item.id,
-				title: item.title || item.name || 'Untitled',
-				posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
-				backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` : '',
-				releaseDate: item.release_date || item.first_air_date || '',
-				overview: item.overview || '',
-				mediaType: mediaType,
-				voteAverage: item.vote_average ? Math.round(item.vote_average * 10) / 10 : undefined,
-				voteCount: item.vote_count || 0
-			}));
+			return ((data.results || []) as TmdbDiscoverRawItem[]).map(
+				(item): DiscoveryItem => ({
+					id: item.id,
+					title: item.title || item.name || 'Untitled',
+					posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
+					backdropPath: item.backdrop_path
+						? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
+						: '',
+					releaseDate: item.release_date || item.first_air_date || '',
+					overview: item.overview || '',
+					mediaType: mediaType,
+					voteAverage: item.vote_average ? Math.round(item.vote_average * 10) / 10 : undefined,
+					voteCount: item.vote_count || 0
+				})
+			);
 		} catch (error) {
 			console.error('Discovery error:', error);
-			return [];
+			throw new Error('Failed to load discovery content');
 		}
 	}
 );
@@ -114,7 +150,13 @@ export const getMediaDetails = query(
 		id: v.number(),
 		mediaType: v.picklist(['movie', 'tv'])
 	}),
-	async ({ id, mediaType }: { id: number; mediaType: 'movie' | 'tv' }): Promise<MediaDetails | null> => {
+	async ({
+		id,
+		mediaType
+	}: {
+		id: number;
+		mediaType: 'movie' | 'tv';
+	}): Promise<MediaDetails | null> => {
 		const apiKey = env.TMDB_API_KEY;
 		if (!apiKey) return null;
 
@@ -136,8 +178,13 @@ export const getMediaDetails = query(
 					if (omdbRes.ok) {
 						const omdbData = await omdbRes.json();
 						if (omdbData.Response === 'True') {
-							imdbRating = omdbData.imdbRating && omdbData.imdbRating !== 'N/A' ? `${omdbData.imdbRating}/10` : undefined;
-							const rtRating = omdbData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes');
+							imdbRating =
+								omdbData.imdbRating && omdbData.imdbRating !== 'N/A'
+									? `${omdbData.imdbRating}/10`
+									: undefined;
+							const rtRating = (
+								omdbData.Ratings as { Source?: string; Value?: string }[] | undefined
+							)?.find((r) => r.Source === 'Rotten Tomatoes');
 							if (rtRating) {
 								rottenTomatoesScore = rtRating.Value;
 							}
@@ -149,25 +196,29 @@ export const getMediaDetails = query(
 			}
 
 			// Find trailer key
-			const trailerObj = data.videos?.results?.find(
-				(v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')
-			);
+			const trailerObj = (
+				data.videos?.results as { site?: string; type?: string; key?: string }[] | undefined
+			)?.find((vid) => vid.site === 'YouTube' && (vid.type === 'Trailer' || vid.type === 'Teaser'));
 
 			return {
 				id: data.id,
 				title: data.title || data.name || 'Untitled',
 				posterPath: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : '',
-				backdropPath: data.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}` : '',
+				backdropPath: data.backdrop_path
+					? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+					: '',
 				releaseDate: data.release_date || data.first_air_date || '',
 				overview: data.overview || '',
 				mediaType: mediaType,
 				voteAverage: data.vote_average ? Math.round(data.vote_average * 10) / 10 : 0,
 				voteCount: data.vote_count || 0,
-				genres: data.genres ? data.genres.map((g: any) => g.name) : [],
+				genres: data.genres ? (data.genres as { name: string }[]).map((g) => g.name) : [],
 				runtime: data.runtime || (data.episode_run_time ? data.episode_run_time[0] : undefined),
 				tagline: data.tagline || '',
 				imdbId,
-				imdbRating: imdbRating || (data.vote_average ? `${Math.round(data.vote_average * 10) / 10}/10` : undefined),
+				imdbRating:
+					imdbRating ||
+					(data.vote_average ? `${Math.round(data.vote_average * 10) / 10}/10` : undefined),
 				rottenTomatoesScore,
 				trailerKey: trailerObj?.key
 			};

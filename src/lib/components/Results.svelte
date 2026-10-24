@@ -52,6 +52,7 @@
 	}
 
 	function toggleFilter(category: TagCategory, tag: string) {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const newCategorySet = new Set(selectedFilters[category]);
 		if (newCategorySet.has(tag)) {
 			newCategorySet.delete(tag);
@@ -128,7 +129,7 @@
 
 	let sortedResults = $derived(
 		[...filteredResults].sort((a, b) => {
-			let valA: any, valB: any;
+			let valA: string | number, valB: string | number;
 
 			switch (sortColumn) {
 				case 'quality':
@@ -172,6 +173,7 @@
 	);
 
 	function clearAllFilters() {
+		filterQuery = '';
 		selectedFilters = {
 			Resolution: new Set(),
 			Source: new Set(),
@@ -183,9 +185,46 @@
 		currentPage = 1;
 	}
 
+	function getFlatTags(title: string): { category: TagCategory; tag: string }[] {
+		const extracted = extractTags(title);
+		const list: { category: TagCategory; tag: string }[] = [];
+		for (const category of Object.keys(extracted) as TagCategory[]) {
+			for (const tag of extracted[category]) {
+				list.push({ category, tag });
+			}
+		}
+		return list;
+	}
+
+	function getAriaSort(column: string): 'ascending' | 'descending' | 'none' {
+		if (sortColumn !== column) return 'none';
+		return sortDirection === 'asc' ? 'ascending' : 'descending';
+	}
+
+	// navigator.clipboard only exists in secure contexts (https/localhost), so when the
+	// app is reached over plain http on a LAN address we fall back to execCommand.
+	function legacyCopy(text: string) {
+		const textarea = document.createElement('textarea');
+		textarea.value = text;
+		textarea.setAttribute('readonly', '');
+		textarea.style.position = 'fixed';
+		textarea.style.opacity = '0';
+		document.body.appendChild(textarea);
+		textarea.select();
+		try {
+			if (!document.execCommand('copy')) throw new Error('execCommand copy was rejected');
+		} finally {
+			textarea.remove();
+		}
+	}
+
 	async function copyToClipboard(text: string) {
 		try {
-			await navigator.clipboard.writeText(text);
+			if (navigator.clipboard && window.isSecureContext) {
+				await navigator.clipboard.writeText(text);
+			} else {
+				legacyCopy(text);
+			}
 			copiedMagnet = text;
 			setTimeout(() => {
 				if (copiedMagnet === text) copiedMagnet = null;
@@ -199,7 +238,17 @@
 <!-- Filter row -->
 <div class="filter-row">
 	<span class="filter-chip-label">
-		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="14"
+			height="14"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg
+		>
 		Filters
 	</span>
 
@@ -212,12 +261,35 @@
 		{/if}
 		Categories
 		{#if isFilterMenuOpen}
-			<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+			<svg
+				class="chevron"
+				xmlns="http://www.w3.org/2000/svg"
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg
+			>
 		{/if}
 	</button>
 
 	<div class="filter-input-wrapper">
-		<svg class="filter-search-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+		<svg
+			class="filter-search-icon"
+			xmlns="http://www.w3.org/2000/svg"
+			width="13"
+			height="13"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg
+		>
 		<input
 			type="text"
 			placeholder="Filter title results…"
@@ -239,17 +311,39 @@
 <!-- Active filter chips -->
 {#if activeFilterCount > 0}
 	<div class="active-filters-bar" transition:fade={{ duration: 150 }}>
-		{#each Object.keys(selectedFilters) as key}
+		{#each Object.keys(selectedFilters) as key (key)}
 			{@const category = key as TagCategory}
-			{#each selectedFilters[category] as tag}
+			{#each selectedFilters[category] as tag (tag)}
 				<button class="active-filter-chip" onclick={() => toggleFilter(category, tag)}>
 					{tag}
-					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+					>
 				</button>
 			{/each}
 		{/each}
 		<button class="clear-all-btn" onclick={clearAllFilters}>
-			<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="10"
+				height="10"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+			>
 			Clear all
 		</button>
 	</div>
@@ -265,23 +359,45 @@
 					<span class="fp-count"><strong>{activeFilterCount}</strong> active</span>
 					{#if activeFilterCount > 0}
 						<button class="fp-clear" onclick={clearAllFilters}>
-							<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="10"
+								height="10"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+							>
 							Clear all
 						</button>
 					{/if}
 					<button class="fp-close" onclick={() => (isFilterMenuOpen = false)} aria-label="Close">
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+						>
 					</button>
 				</div>
 			</div>
 
 			<div class="fp-categories">
-				{#each categories as category}
+				{#each categories as category (category)}
 					{#if availableTags[category].length > 0}
 						<div class="fp-category">
 							<div class="fp-cat-label">{category}</div>
 							<div class="fp-tags">
-								{#each availableTags[category] as tag}
+								{#each availableTags[category] as tag (tag)}
 									<button
 										class="fp-tag {selectedFilters[category].has(tag) ? 'active' : ''}"
 										onclick={() => toggleFilter(category, tag)}
@@ -304,7 +420,11 @@
 {#snippet sortIcon(column: string)}
 	<span class="sort-icon" class:inactive={sortColumn !== column}>
 		<MorphIcon
-			icon={sortColumn !== column ? ChevronsUpDown : sortDirection === 'asc' ? ChevronUp : ChevronDown}
+			icon={sortColumn !== column
+				? ChevronsUpDown
+				: sortDirection === 'asc'
+					? ChevronUp
+					: ChevronDown}
 			size={14}
 			strokeWidth={2}
 			reducedMotion="user"
@@ -317,101 +437,140 @@
 	<table>
 		<thead>
 			<tr>
-				<th onclick={() => toggleSort('quality')} class="sortable col-quality">
-					<div class="th-content">
+				<th aria-sort={getAriaSort('quality')} class="col-quality">
+					<button type="button" class="th-btn" onclick={() => toggleSort('quality')}>
 						Quality
 						{@render sortIcon('quality')}
-					</div>
+					</button>
 				</th>
-				<th onclick={() => toggleSort('title')} class="sortable">
-					<div class="th-content">
+				<th aria-sort={getAriaSort('title')}>
+					<button type="button" class="th-btn" onclick={() => toggleSort('title')}>
 						Release Title
 						{@render sortIcon('title')}
-					</div>
+					</button>
 				</th>
-				<th onclick={() => toggleSort('size')} class="sortable col-size">
-					<div class="th-content">
+				<th aria-sort={getAriaSort('size')} class="col-size">
+					<button type="button" class="th-btn" onclick={() => toggleSort('size')}>
 						Size
 						{@render sortIcon('size')}
-					</div>
+					</button>
 				</th>
-				<th onclick={() => toggleSort('seeds')} class="right sortable">
-					<div class="th-content right">
+				<th aria-sort={getAriaSort('seeds')} class="right">
+					<button type="button" class="th-btn right" onclick={() => toggleSort('seeds')}>
 						Seeds
 						{@render sortIcon('seeds')}
-					</div>
+					</button>
 				</th>
-				<th onclick={() => toggleSort('peers')} class="right sortable">
-					<div class="th-content right">
+				<th aria-sort={getAriaSort('peers')} class="right">
+					<button type="button" class="th-btn right" onclick={() => toggleSort('peers')}>
 						Peers
 						{@render sortIcon('peers')}
-					</div>
+					</button>
 				</th>
-				<th onclick={() => toggleSort('date')} class="right sortable">
-					<div class="th-content right">
+				<th aria-sort={getAriaSort('date')} class="right">
+					<button type="button" class="th-btn right" onclick={() => toggleSort('date')}>
 						Age
 						{@render sortIcon('date')}
-					</div>
+					</button>
 				</th>
 			</tr>
 		</thead>
 		<tbody>
-			{#each paginatedResults as result (result.magnet || result.title)}
-				{@const qInfo = getQualityTier(result.title)}
-				<tr transition:fade={{ duration: 150 }}>
-					<td class="col-quality">
-						<span class="q-badge {qInfo.badgeColor}" title={`Quality score: ${qInfo.score}`}>
-							{#if qInfo.badgeColor === 'gold'}
-								👑 {qInfo.tier}
-							{:else if qInfo.badgeColor === 'blue'}
-								💎 {qInfo.tier}
-							{:else if qInfo.badgeColor === 'green'}
-								⚡ {qInfo.tier}
-							{:else}
-								⚠️ {qInfo.tier}
-							{/if}
-						</span>
-					</td>
-					<td class="col-title">
-						<div class="title-main">
-							<div class="actions-group">
-								{#if result.magnet}
-									<a
-										class="magnet-btn"
-										href={result.magnet}
-										title="Open Magnet Link"
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-										Magnet
-									</a>
-									<button
-										class="copy-btn {copiedMagnet === result.magnet ? 'copied' : ''}"
-										onclick={() => copyToClipboard(result.magnet)}
-										title="Copy Magnet Link"
-									>
-										<MorphIcon
-											icon={copiedMagnet === result.magnet ? Check : Copy}
-											size={12}
-											strokeWidth={2}
-											spring="snappy"
-											reducedMotion="user"
-										/>
-									</button>
-								{/if}
-							</div>
-							<span class="title-text" title={result.title}>{result.title}</span>
+			{#if paginatedResults.length === 0}
+				<tr>
+					<td colspan="6" class="empty-filter-cell">
+						<div class="empty-filter-state">
+							<p>No releases match your active filters.</p>
+							<button type="button" class="reset-filters-btn" onclick={clearAllFilters}>
+								Reset filters
+							</button>
 						</div>
 					</td>
-					<td class="col-size">{result.size}</td>
-					<td class="right col-seeds">
-						<span class="seed-val" class:zero={result.seeds === 0}>{result.seeds}</span>
-					</td>
-					<td class="right col-peers">
-						<span class="peer-val" class:low={result.peers < 5}>{result.peers}</span>
-					</td>
-					<td class="right col-age">{timeAgo(result.publishDate)}</td>
 				</tr>
-			{/each}
+			{:else}
+				{#each paginatedResults as result (result.magnet || result.title)}
+					{@const qInfo = getQualityTier(result.title)}
+					{@const rowTags = getFlatTags(result.title)}
+					<tr transition:fade={{ duration: 150 }}>
+						<td class="col-quality" data-label="Quality">
+							<span class="q-badge {qInfo.badgeColor}" title={`Quality score: ${qInfo.score}`}>
+								<span class="q-dot" aria-hidden="true"></span>
+								{qInfo.tier}
+							</span>
+						</td>
+						<td class="col-title" data-label="Release">
+							<div class="title-main">
+								<div class="actions-group">
+									{#if result.magnet}
+										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+										<a class="magnet-btn" href={result.magnet} title="Open Magnet Link">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2.5"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												aria-hidden="true"
+											>
+												<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+												<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+											</svg>
+											Magnet
+										</a>
+										<button
+											type="button"
+											class="copy-btn {copiedMagnet === result.magnet ? 'copied' : ''}"
+											onclick={() => copyToClipboard(result.magnet)}
+											title="Copy Magnet Link"
+											aria-label="Copy Magnet Link"
+										>
+											<MorphIcon
+												icon={copiedMagnet === result.magnet ? Check : Copy}
+												size={12}
+												strokeWidth={2}
+												spring="snappy"
+												reducedMotion="user"
+											/>
+										</button>
+									{/if}
+								</div>
+								<div class="title-stack">
+									<span class="title-text" title={result.title}>{result.title}</span>
+									{#if (result.tracker && result.tracker !== 'Unknown') || rowTags.length > 0}
+										<div class="row-tags">
+											{#if result.tracker && result.tracker !== 'Unknown'}
+												<span class="tracker-pill" title="Indexer / Tracker">{result.tracker}</span>
+											{/if}
+											{#each rowTags as { category, tag } (`${category}:${tag}`)}
+												<button
+													type="button"
+													class="inline-tag {selectedFilters[category].has(tag) ? 'active' : ''}"
+													onclick={() => toggleFilter(category, tag)}
+													title="Filter by {category}: {tag}"
+												>
+													{tag}
+												</button>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							</div>
+						</td>
+						<td class="col-size" data-label="Size">{result.size}</td>
+						<td class="right col-seeds" data-label="Seeds">
+							<span class="seed-val" class:zero={result.seeds === 0}>{result.seeds}</span>
+						</td>
+						<td class="right col-peers" data-label="Peers">
+							<span class="peer-val" class:low={result.peers < 5}>{result.peers}</span>
+						</td>
+						<td class="right col-age" data-label="Age">{timeAgo(result.publishDate)}</td>
+					</tr>
+				{/each}
+			{/if}
 		</tbody>
 	</table>
 </div>
@@ -590,7 +749,7 @@
 	.fp-clear:hover {
 		background: rgba(243, 107, 107, 0.15);
 		border-color: rgba(243, 107, 107, 0.4);
-		color: #F36B6B;
+		color: #f36b6b;
 	}
 
 	.filter-panel {
@@ -700,32 +859,34 @@
 
 	th {
 		background: var(--surface-2);
+		padding: 0;
+		border-bottom: 1px solid var(--border);
+		user-select: none;
+	}
+
+	.th-btn {
+		width: 100%;
 		padding: 12px 14px;
+		background: none;
+		border: none;
 		font-family: var(--font-mono);
 		font-size: 11px;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		color: var(--muted);
-		border-bottom: 1px solid var(--border);
-		user-select: none;
-	}
-
-	th.sortable {
 		cursor: pointer;
-	}
-
-	th.sortable:hover {
-		color: var(--fg);
-	}
-
-	.th-content {
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		transition: color 0.15s;
 	}
 
-	.th-content.right {
+	.th-btn:hover {
+		color: var(--fg);
+	}
+
+	.th-btn.right {
 		justify-content: flex-end;
 	}
 
@@ -744,14 +905,49 @@
 		background: rgba(255, 255, 255, 0.02);
 	}
 
+	.empty-filter-cell {
+		padding: 40px 20px;
+		text-align: center;
+	}
+
+	.empty-filter-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		color: var(--muted);
+		font-family: var(--font-body);
+		font-size: 14px;
+	}
+
+	.reset-filters-btn {
+		background: var(--accent-dim);
+		border: 1px solid var(--accent);
+		color: var(--accent);
+		padding: 6px 14px;
+		border-radius: 6px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.reset-filters-btn:hover {
+		background: var(--accent);
+		color: #080b0f;
+	}
+
 	.col-quality {
 		white-space: nowrap;
 		width: 120px;
 	}
 
 	.q-badge {
-		display: inline-block;
-		padding: 2px 8px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 8px;
 		border-radius: 4px;
 		font-family: var(--font-mono);
 		font-size: 10px;
@@ -760,38 +956,94 @@
 		letter-spacing: 0.02em;
 	}
 
+	.q-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: currentColor;
+		flex-shrink: 0;
+	}
+
 	.q-badge.gold {
 		background: rgba(245, 197, 24, 0.15);
-		color: #F5C518;
+		color: #f5c518;
 		border: 1px solid rgba(245, 197, 24, 0.3);
 	}
 
 	.q-badge.blue {
 		background: rgba(59, 130, 246, 0.15);
-		color: #60A5FA;
+		color: #60a5fa;
 		border: 1px solid rgba(59, 130, 246, 0.3);
 	}
 
 	.q-badge.green {
 		background: rgba(16, 185, 129, 0.15);
-		color: #34D399;
+		color: #34d399;
 		border: 1px solid rgba(16, 185, 129, 0.3);
 	}
 
 	.q-badge.amber {
 		background: rgba(245, 158, 11, 0.15);
-		color: #FBBF24;
+		color: #fbbf24;
 		border: 1px solid rgba(245, 158, 11, 0.3);
 	}
 
 	.col-title {
-		max-width: 500px;
+		max-width: 560px;
 	}
 
 	.title-main {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 10px;
+	}
+
+	.title-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.row-tags {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.tracker-pill {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		color: var(--muted);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		padding: 1px 6px;
+	}
+
+	.inline-tag {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		color: var(--fg);
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		padding: 1px 6px;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.inline-tag:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.inline-tag.active {
+		background: var(--accent-dim);
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 
 	.actions-group {
@@ -799,6 +1051,7 @@
 		align-items: center;
 		gap: 4px;
 		flex-shrink: 0;
+		margin-top: 1px;
 	}
 
 	.magnet-btn {
@@ -841,8 +1094,8 @@
 	}
 
 	.copy-btn.copied {
-		color: #34D399;
-		border-color: #34D399;
+		color: #34d399;
+		border-color: #34d399;
 	}
 
 	.sort-icon {
@@ -854,7 +1107,7 @@
 		opacity: 0.3;
 	}
 
-	.sortable:hover .sort-icon.inactive {
+	.th-btn:hover .sort-icon.inactive {
 		opacity: 0.6;
 	}
 
@@ -870,6 +1123,7 @@
 		white-space: nowrap;
 		font-family: var(--font-mono);
 		font-size: 12px;
+		font-variant-numeric: tabular-nums;
 		color: var(--muted);
 	}
 
@@ -880,7 +1134,8 @@
 	.seed-val {
 		font-family: var(--font-mono);
 		font-weight: 600;
-		color: #34D399;
+		font-variant-numeric: tabular-nums;
+		color: #34d399;
 	}
 
 	.seed-val.zero {
@@ -889,6 +1144,7 @@
 
 	.peer-val {
 		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		color: var(--fg);
 	}
 
@@ -900,7 +1156,83 @@
 		white-space: nowrap;
 		font-family: var(--font-mono);
 		font-size: 11px;
+		font-variant-numeric: tabular-nums;
 		color: var(--muted);
+	}
+
+	@media (max-width: 767px) {
+		thead {
+			display: none;
+		}
+
+		table,
+		tbody,
+		tr,
+		td {
+			display: block;
+			width: 100%;
+		}
+
+		tr {
+			padding: 12px 14px;
+			border-bottom: 1px solid var(--border);
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 8px 12px;
+		}
+
+		tr:last-child {
+			border-bottom: none;
+		}
+
+		td {
+			padding: 0;
+			border-bottom: none;
+			width: auto;
+		}
+
+		.col-quality {
+			width: auto;
+			order: 1;
+		}
+
+		.col-age {
+			order: 2;
+			margin-left: auto;
+		}
+
+		.col-title {
+			order: 3;
+			width: 100%;
+			max-width: none;
+		}
+
+		.title-text {
+			white-space: normal;
+			word-break: break-word;
+		}
+
+		.col-size,
+		.col-seeds,
+		.col-peers {
+			order: 4;
+			font-size: 12px;
+		}
+
+		.col-seeds::before {
+			content: 'S: ';
+			color: var(--muted);
+			font-family: var(--font-mono);
+			font-size: 11px;
+		}
+
+		.col-peers::before {
+			content: 'P: ';
+			color: var(--muted);
+			font-family: var(--font-mono);
+			font-size: 11px;
+		}
 	}
 
 	.pagination {

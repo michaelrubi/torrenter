@@ -15,6 +15,16 @@
 	}>();
 
 	let showTrailer = $state(false);
+	let closeBtnEl: HTMLButtonElement | undefined = $state();
+
+	$effect(() => {
+		const prevOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		closeBtnEl?.focus();
+		return () => {
+			document.body.style.overflow = prevOverflow;
+		};
+	});
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
@@ -29,15 +39,39 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-backdrop" onclick={onClose} transition:fade={{ duration: 150 }}>
-	<div class="modal-card" onclick={(e) => e.stopPropagation()} transition:scale={{ duration: 180, start: 0.95 }}>
-		<button class="close-btn" onclick={onClose} aria-label="Close">
-			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+	<div
+		class="modal-card"
+		role="dialog"
+		tabindex="-1"
+		aria-modal="true"
+		aria-labelledby={details ? 'modal-media-title' : undefined}
+		aria-label={details ? undefined : 'Media details'}
+		onclick={(e) => e.stopPropagation()}
+		transition:scale={{ duration: 180, start: 0.95 }}
+	>
+		<button bind:this={closeBtnEl} class="close-btn" onclick={onClose} aria-label="Close modal">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+			>
 		</button>
 
 		{#if loading}
 			<div class="modal-loading">
 				<div class="spinner"></div>
 				<p>Loading media details…</p>
+			</div>
+		{:else if !details}
+			<div class="modal-loading">
+				<p>Unable to load media details right now.</p>
 			</div>
 		{:else if details}
 			<div class="backdrop-wrapper">
@@ -56,8 +90,9 @@
 					</div>
 
 					<div class="title-info">
-						<span class="media-type-tag">{details.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
-						<h2>{details.title}</h2>
+						<span class="media-type-tag">{details.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span
+						>
+						<h2 id="modal-media-title">{details.title}</h2>
 						{#if details.tagline}
 							<p class="tagline">"{details.tagline}"</p>
 						{/if}
@@ -77,15 +112,34 @@
 						<!-- Ratings & External Links -->
 						<div class="ratings-bar">
 							{#if details.imdbRating || details.voteAverage}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -->
 								<a
-									href={details.imdbId ? `https://www.imdb.com/title/${details.imdbId}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(details.title)}`}
+									href={details.imdbId
+										? `https://www.imdb.com/title/${details.imdbId}/`
+										: `https://www.imdb.com/find/?q=${encodeURIComponent(details.title)}`}
 									target="_blank"
 									rel="noopener noreferrer"
 									class="rating-pill imdb"
 									title="View on IMDb"
 								>
+									<!-- eslint-enable svelte/no-navigation-without-resolve -->
 									<span class="brand-logo imdb-logo">IMDb</span>
-									<span class="rating-val">⭐ {details.imdbRating || `${details.voteAverage}/10`}</span>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="11"
+										height="11"
+										viewBox="0 0 24 24"
+										fill="currentColor"
+										stroke="currentColor"
+										stroke-width="2"
+										aria-hidden="true"
+									>
+										<polygon
+											points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+										/>
+									</svg>
+									<span class="rating-val">{details.imdbRating || `${details.voteAverage}/10`}</span
+									>
 								</a>
 							{/if}
 
@@ -96,13 +150,21 @@
 								class="rating-pill rt"
 								title="Search on Rotten Tomatoes"
 							>
-								<span class="brand-logo rt-logo">🍅 RT</span>
-								<span class="rating-val">{details.rottenTomatoesScore || 'Rotten Tomatoes'}</span>
+								<span class="brand-logo rt-logo">RT</span>
+								<span class="rating-val">
+									{details.rottenTomatoesScore ? details.rottenTomatoesScore : 'Search ↗'}
+								</span>
 							</a>
 
 							{#if details.trailerKey}
 								<button class="trailer-btn" onclick={() => (showTrailer = true)}>
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg
+									>
 									Trailer
 								</button>
 							{/if}
@@ -118,8 +180,25 @@
 				</div>
 
 				<div class="modal-actions">
-					<button class="search-torrents-btn" onclick={() => { onSearch(details.title); onClose(); }}>
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+					<button
+						class="search-torrents-btn"
+						onclick={() => {
+							onSearch(details.title);
+							onClose();
+						}}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg
+						>
 						Search Torrents for "{details.title}"
 					</button>
 				</div>
@@ -131,7 +210,11 @@
 {#if showTrailer && details?.trailerKey}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="trailer-modal" onclick={() => (showTrailer = false)} transition:fade={{ duration: 150 }}>
+	<div
+		class="trailer-modal"
+		onclick={() => (showTrailer = false)}
+		transition:fade={{ duration: 150 }}
+	>
 		<div class="trailer-wrapper" onclick={(e) => e.stopPropagation()}>
 			<button class="close-trailer" onclick={() => (showTrailer = false)}>✕</button>
 			<iframe
@@ -212,7 +295,9 @@
 	}
 
 	@keyframes spin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.backdrop-wrapper {
@@ -239,7 +324,12 @@
 	.backdrop-gradient {
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(to bottom, rgba(10, 14, 22, 0.3) 0%, rgba(10, 14, 22, 0.95) 85%, var(--surface) 100%);
+		background: linear-gradient(
+			to bottom,
+			rgba(10, 14, 22, 0.3) 0%,
+			rgba(10, 14, 22, 0.95) 85%,
+			var(--surface) 100%
+		);
 	}
 
 	.header-content {
@@ -348,17 +438,17 @@
 	.rating-pill.imdb {
 		background: rgba(245, 197, 24, 0.15);
 		border: 1px solid rgba(245, 197, 24, 0.4);
-		color: #F5C518;
+		color: #f5c518;
 	}
 
 	.rating-pill.rt {
 		background: rgba(250, 50, 50, 0.15);
 		border: 1px solid rgba(250, 50, 50, 0.4);
-		color: #FA3232;
+		color: #fa3232;
 	}
 
 	.imdb-logo {
-		background: #F5C518;
+		background: #f5c518;
 		color: #000;
 		font-weight: 800;
 		padding: 1px 4px;
@@ -367,7 +457,12 @@
 	}
 
 	.rt-logo {
-		font-weight: 700;
+		background: #fa3232;
+		color: #fff;
+		font-weight: 800;
+		padding: 1px 4px;
+		border-radius: 3px;
+		font-size: 10px;
 	}
 
 	.trailer-btn {

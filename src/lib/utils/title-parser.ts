@@ -94,14 +94,23 @@ export function getQualityTier(title: string): QualityInfo {
 	if (extracted.Other.includes('REMUX')) score += 15;
 	if (extracted.Source.includes('WEB')) score += 12;
 	if (extracted.Source.includes('DVD')) score += 5;
-	if (extracted.Source.includes('CAM') || extracted.Source.includes('TS') || extracted.Source.includes('TC')) score -= 40;
+	if (
+		extracted.Source.includes('CAM') ||
+		extracted.Source.includes('TS') ||
+		extracted.Source.includes('TC')
+	)
+		score -= 40;
 
 	// Codec & Audio & Extras
 	if (extracted.Other.includes('Dolby Vision') || extracted.Other.includes('HDR')) score += 8;
 	if (extracted.Audio.includes('Atmos') || extracted.Audio.includes('7.1')) score += 7;
 	if (extracted.Codec.includes('x265') || extracted.Codec.includes('AV1')) score += 5;
 
-	if (score >= 85 || extracted.Source.includes('DCPRIP') || (extracted.Resolution.includes('4K') && extracted.Other.includes('REMUX'))) {
+	if (
+		score >= 85 ||
+		extracted.Source.includes('DCPRIP') ||
+		(extracted.Resolution.includes('4K') && extracted.Other.includes('REMUX'))
+	) {
 		return { tier: 'Top Tier', score, badgeColor: 'gold' };
 	} else if (score >= 65) {
 		return { tier: 'High Quality', score, badgeColor: 'blue' };
