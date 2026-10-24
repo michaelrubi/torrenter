@@ -13,30 +13,35 @@ A modern, fast, and efficient movie and TV show search application built with Sv
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
+
 - Node.js (v18 or later)
 - [Jackett](https://github.com/Jackett/Jackett) (running and configured)
 
 ## Getting Started
 
 1.  **Clone the repository:**
+
     ```bash
     git clone https://github.com/michaelrubi/torrenter.git
     cd torrenter
     ```
 
 2.  **Install dependencies:**
+
     ```bash
     npm install
     ```
 
 3.  **Configure Environment Variables:**
     Create a `.env` file in the root directory and add your Jackett configuration:
+
     ```env
     JACKETT_URL=http://localhost:9117
     JACKETT_API_KEY=your_jackett_api_key_here
     ```
 
 4.  **Start the development server:**
+
     ```bash
     npm run dev
     ```
