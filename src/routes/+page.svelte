@@ -5,6 +5,7 @@
 	import MediaModal from '$lib/components/MediaModal.svelte';
 	import { searchTorrents, getDiscoveryContent, getMediaDetails } from './data.remote';
 	import type { Torrent, DiscoveryItem, MediaDetails } from '$lib/types';
+	import { isHttpError } from '@sveltejs/kit';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -136,10 +137,9 @@
 			results = await searchTorrents(term);
 		} catch (error) {
 			console.error('Search failed:', error);
-			searchError =
-				error instanceof Error
-					? error.message
-					: 'Unable to reach Jackett indexer. Check your connection or indexer status.';
+			searchError = isHttpError(error)
+				? error.body.message
+				: 'Unable to reach Jackett indexer. Check your connection or indexer status.';
 			results = [];
 		} finally {
 			loading = false;
@@ -448,6 +448,7 @@
 
 	.search-input {
 		flex: 1;
+		min-width: 0;
 		background: none;
 		border: none;
 		outline: none;

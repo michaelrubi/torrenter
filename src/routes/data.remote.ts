@@ -1,4 +1,5 @@
 import { query } from '$app/server';
+import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import * as v from 'valibot';
 
@@ -36,7 +37,7 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 
 	if (!apiKey || !jackettUrl) {
 		console.warn('JACKETT_API_KEY or JACKETT_URL not set');
-		throw new Error('Jackett indexer is not configured (missing JACKETT_URL or JACKETT_API_KEY)');
+		error(503, 'Jackett indexer is not configured (missing JACKETT_URL or JACKETT_API_KEY)');
 	}
 
 	const limit = 1000;
@@ -89,9 +90,9 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 			});
 
 		return results;
-	} catch (error) {
-		console.error('Search error:', error);
-		throw new Error('Failed to fetch results');
+	} catch (err) {
+		console.error('Search error:', err);
+		error(502, 'Unable to reach the Jackett indexer. Check its status and try again.');
 	}
 });
 
