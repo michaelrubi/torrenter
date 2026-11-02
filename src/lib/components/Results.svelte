@@ -488,7 +488,7 @@
 					</td>
 				</tr>
 			{:else}
-				{#each paginatedResults as result (result.magnet || result.title)}
+				{#each paginatedResults as result (result.id)}
 					{@const qInfo = getQualityTier(result.title)}
 					{@const rowTags = getFlatTags(result.title)}
 					<tr transition:fade={{ duration: 150 }}>
@@ -536,15 +536,42 @@
 												reducedMotion="user"
 											/>
 										</button>
+									{:else if result.downloadUrl}
+										<!-- rel="external" keeps the router out of a server-only file route. -->
+										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+										<a
+											class="magnet-btn"
+											href={result.downloadUrl}
+											rel="external"
+											title="Download .torrent File"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2.5"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												aria-hidden="true"
+											>
+												<path d="M12 3v12" />
+												<path d="m7 10 5 5 5-5" />
+												<path d="M5 21h14" />
+											</svg>
+											Torrent
+										</a>
 									{/if}
 								</div>
 								<div class="title-stack">
 									<span class="title-text" title={result.title}>{result.title}</span>
-									{#if (result.tracker && result.tracker !== 'Unknown') || rowTags.length > 0}
+									{#if result.trackers.length > 0 || rowTags.length > 0}
 										<div class="row-tags">
-											{#if result.tracker && result.tracker !== 'Unknown'}
-												<span class="tracker-pill" title="Indexer / Tracker">{result.tracker}</span>
-											{/if}
+											{#each result.trackers as tracker (tracker)}
+												<span class="tracker-pill" title="Indexer / Tracker">{tracker}</span>
+											{/each}
 											{#each rowTags as { category, tag } (`${category}:${tag}`)}
 												<button
 													type="button"

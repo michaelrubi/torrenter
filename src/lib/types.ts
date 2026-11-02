@@ -1,13 +1,15 @@
 export interface Torrent {
+	id: string;
 	title: string;
 	magnet: string;
+	downloadUrl: string;
 	seeds: number;
 	peers: number;
 	size: string;
 	sizeBytes: number;
 	date: string;
 	publishDate: string;
-	tracker: string;
+	trackers: string[];
 }
 
 export interface DiscoveryItem {
