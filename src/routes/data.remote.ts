@@ -3,18 +3,13 @@ import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import * as v from 'valibot';
 
+import {
+	getInfoHash,
+	mergeDuplicates,
+	toDownloadUrl,
+	type JackettRawResult
+} from '$lib/server/jackett';
 import type { Torrent, DiscoveryItem, MediaDetails } from '$lib/types';
-
-interface JackettRawResult {
-	CategoryDesc?: string;
-	Title: string;
-	MagnetUri?: string;
-	Seeders?: number;
-	Peers?: number;
-	Size?: number;
-	PublishDate?: string;
-	Tracker?: string;
-}
 
 interface TmdbDiscoverRawItem {
 	id: number;
@@ -58,7 +53,9 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 			.map((result) => {
 				const {
 					Title: title,
-					MagnetUri: magnet,
+					MagnetUri,
+					Link,
+					InfoHash,
 					Seeders: seeds,
 					Peers: peers,
 					Size,
@@ -76,20 +73,28 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 				})();
 
 				const date = PublishDate ? new Date(PublishDate).toLocaleDateString() : '';
+				const magnet = MagnetUri || (Link?.startsWith('magnet:') ? Link : '');
+				const downloadUrl = toDownloadUrl(Link);
 				return {
+					id:
+						getInfoHash(magnet, InfoHash) ||
+						magnet ||
+						downloadUrl ||
+						`${tracker}:${title}:${Size ?? 0}`,
 					title,
-					magnet: magnet || '',
+					magnet,
+					downloadUrl,
 					seeds: seeds || 0,
 					peers: peers || 0,
 					size,
 					sizeBytes: Size || 0,
 					date,
 					publishDate: PublishDate || '',
-					tracker: tracker || 'Unknown'
+					trackers: tracker ? [tracker] : []
 				};
 			});
 
-		return results;
+		return mergeDuplicates(results);
 	} catch (err) {
 		console.error('Search error:', err);
 		error(502, 'Unable to reach the Jackett indexer. Check its status and try again.');
@@ -124,21 +129,19 @@ export const getDiscoveryContent = query(
 
 			const data = await response.json();
 
-			return ((data.results || []) as TmdbDiscoverRawItem[]).map(
-				(item): DiscoveryItem => ({
-					id: item.id,
-					title: item.title || item.name || 'Untitled',
-					posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
-					backdropPath: item.backdrop_path
-						? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
-						: '',
-					releaseDate: item.release_date || item.first_air_date || '',
-					overview: item.overview || '',
-					mediaType: mediaType,
-					voteAverage: item.vote_average ? Math.round(item.vote_average * 10) / 10 : undefined,
-					voteCount: item.vote_count || 0
-				})
-			);
+			return ((data.results || []) as TmdbDiscoverRawItem[]).map((item): DiscoveryItem => ({
+				id: item.id,
+				title: item.title || item.name || 'Untitled',
+				posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
+				backdropPath: item.backdrop_path
+					? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
+					: '',
+				releaseDate: item.release_date || item.first_air_date || '',
+				overview: item.overview || '',
+				mediaType: mediaType,
+				voteAverage: item.vote_average ? Math.round(item.vote_average * 10) / 10 : undefined,
+				voteCount: item.vote_count || 0
+			}));
 		} catch (error) {
 			console.error('Discovery error:', error);
 			throw new Error('Failed to load discovery content');

@@ -7,12 +7,12 @@
 		loading = false,
 		onClose,
 		onSearch
-	} = $props<{
+	}: {
 		details: MediaDetails | null;
 		loading?: boolean;
 		onClose: () => void;
 		onSearch: (title: string) => void;
-	}>();
+	} = $props();
 
 	let showTrailer = $state(false);
 	let closeBtnEl: HTMLButtonElement | undefined = $state();

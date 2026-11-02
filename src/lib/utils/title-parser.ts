@@ -6,7 +6,19 @@ export interface QualityInfo {
 	badgeColor: 'gold' | 'blue' | 'green' | 'amber';
 }
 
-export function extractTags(title: string): Record<TagCategory, string[]> {
+// Short words like "Cam" or "Web" can be part of a film's name, so they only count
+// once the name has ended, at the first year, resolution or season marker.
+function releaseInfoOf(title: string): string {
+	for (const match of title.matchAll(/\b(?:19|20)\d{2}\b|\b\d{3,4}p\b|\bS\d{1,2}(?=E\d|\b)/gi)) {
+		if (match.index > 0) return title.slice(match.index);
+	}
+	return title;
+}
+
+export function extractTags(rawTitle: string): Record<TagCategory, string[]> {
+	// \b treats underscores as word characters, so normalise them to separators.
+	const title = rawTitle.replace(/_/g, '.');
+	const releaseInfo = releaseInfoOf(title);
 	const tags: Record<TagCategory, Set<string>> = {
 		Resolution: new Set(),
 		Source: new Set(),
@@ -24,14 +36,22 @@ export function extractTags(title: string): Record<TagCategory, string[]> {
 
 	// Source - INCLUDING DCP / DCPRIP
 	if (/\bdcp-?rip\b|\bdcp\b/i.test(title)) tags.Source.add('DCPRIP');
-	if (/\bbluray\b|\bblu-ray\b|\bbdrip\b|\bbrrip\b/i.test(title)) tags.Source.add('BluRay');
-	if (/\bweb-?dl\b|\bweb-?rip\b|\bweb\b/i.test(title)) tags.Source.add('WEB');
+	if (/\bblu-?ray\b|\bbdrip\b|\bbrrip\b|\bbd-?remux\b/i.test(title)) tags.Source.add('BluRay');
+	if (/\bweb[-.]?dl\b|\bweb-?rip\b/i.test(title) || /\bweb\b/i.test(releaseInfo)) {
+		tags.Source.add('WEB');
+	}
 	if (/\bdvdrip\b|\bdvd\b/i.test(title)) tags.Source.add('DVD');
 	if (/\bhdrip\b/i.test(title)) tags.Source.add('HDRip');
 	if (/\bhdtv\b/i.test(title)) tags.Source.add('HDTV');
-	if (/\bcam\b|\bhdcam\b/i.test(title)) tags.Source.add('CAM');
-	if (/\bts\b|\bhd-?ts\b|\btelevison sync\b|\btelesync\b/i.test(title)) tags.Source.add('TS');
-	if (/\btc\b|\bhd-?tc\b|\btelecine\b/i.test(title)) tags.Source.add('TC');
+	if (/\bhd-?cam\b|\bcam-?rip\b/i.test(title) || /\bcam\b/i.test(releaseInfo)) {
+		tags.Source.add('CAM');
+	}
+	if (/\bhd-?ts\b|\btelesync\b/i.test(title) || /\bts\b/i.test(releaseInfo)) {
+		tags.Source.add('TS');
+	}
+	if (/\bhd-?tc\b|\btelecine\b/i.test(title) || /\btc\b/i.test(releaseInfo)) {
+		tags.Source.add('TC');
+	}
 	if (/\bscr\b|\bscreener\b|\bdvdscr\b/i.test(title)) tags.Source.add('Screener');
 
 	// Codec
@@ -41,17 +61,20 @@ export function extractTags(title: string): Record<TagCategory, string[]> {
 	if (/\bxvid\b/i.test(title)) tags.Codec.add('XviD');
 	if (/\bdivx\b/i.test(title)) tags.Codec.add('DivX');
 
-	// Audio
+	// Audio - channel layouts are often glued to the codec, as in DDP5.1 or AAC2.0
 	if (/\batmos\b/i.test(title)) tags.Audio.add('Atmos');
-	if (/\bdts\b|\bdts-?hd\b|\bdts-x\b/i.test(title)) tags.Audio.add('DTS');
-	if (/\bac3\b|\bddp\b|\beac3\b|\btruehd\b/i.test(title)) tags.Audio.add('AC3');
-	if (/\baac\b/i.test(title)) tags.Audio.add('AAC');
-	if (/\bflac\b/i.test(title)) tags.Audio.add('FLAC');
-	if (/\b5\.1\b/i.test(title)) tags.Audio.add('5.1');
-	if (/\b7\.1\b/i.test(title)) tags.Audio.add('7.1');
+	if (/\bdts(?=\d|\b)/i.test(title)) tags.Audio.add('DTS');
+	if (/\b(?:e-?)?ac-?3(?=\d|\b)|\bddp(?=\d|\b)|\bdd\+?\d|\btruehd(?=\d|\b)/i.test(title)) {
+		tags.Audio.add('AC3');
+	}
+	if (/\baac(?=\d|\b)/i.test(title)) tags.Audio.add('AAC');
+	if (/\bflac(?=\d|\b)/i.test(title)) tags.Audio.add('FLAC');
+	if (/(?<!\d)5\.1(?!\d)/.test(title)) tags.Audio.add('5.1');
+	if (/(?<!\d)7\.1(?!\d)/.test(title)) tags.Audio.add('7.1');
 
 	// Season parsing for TV Shows
-	const sMatch = title.match(/\bS(\d{1,2})\b/i) || title.match(/\bSeason\s*(\d{1,2})\b/i);
+	const sMatch =
+		title.match(/\bS(\d{1,2})(?=E\d|\b)/i) || title.match(/\bSeason[\s.]*(\d{1,2})\b/i);
 	if (sMatch) {
 		const sNum = parseInt(sMatch[1], 10);
 		tags.Season.add(`Season ${sNum}`);
@@ -61,12 +84,14 @@ export function extractTags(title: string): Record<TagCategory, string[]> {
 	}
 
 	// Other
-	if (/\bhdr10\+?\b|\bhdr\b/i.test(title)) tags.Other.add('HDR');
-	if (/\bdolby\s?vision\b|\bdv\b/i.test(title)) tags.Other.add('Dolby Vision');
-	if (/\b10bit\b/i.test(title)) tags.Other.add('10bit');
+	if (/\bhdr(?:10(?:\+|plus)?)?(?!\w)/i.test(title)) tags.Other.add('HDR');
+	if (/\bdolby[\s.]?vision\b/i.test(title) || /\bdv\b/i.test(releaseInfo)) {
+		tags.Other.add('Dolby Vision');
+	}
+	if (/\b10[-\s.]?bit\b/i.test(title)) tags.Other.add('10bit');
 	if (/\b3d\b/i.test(title)) tags.Other.add('3D');
 	if (/\brepack\b/i.test(title)) tags.Other.add('Repack');
-	if (/\bremux\b/i.test(title)) tags.Other.add('REMUX');
+	if (/\b(?:bd-?)?remux\b/i.test(title)) tags.Other.add('REMUX');
 
 	return {
 		Resolution: Array.from(tags.Resolution).sort(),
