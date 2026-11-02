@@ -34,6 +34,12 @@
 	let searchInputEl: HTMLInputElement | undefined = $state();
 	let lastQuery: string | null = null;
 
+	// Each counter names the latest request of its kind, so a slower, older response
+	// can tell it has been superseded and drop itself.
+	let searchRequest = 0;
+	let discoveryRequest = 0;
+	let detailsRequest = 0;
+
 	$effect(() => {
 		const q = (page.url.searchParams.get('search') || '').trim();
 		if (q !== lastQuery) {
@@ -43,9 +49,7 @@
 			if (q) {
 				performSearch(q);
 			} else {
-				hasSearched = false;
-				searchError = null;
-				results = [];
+				resetSearch();
 				if (discoveryResults.length === 0 && !discoveryLoading) {
 					loadDiscovery(1, false);
 				}
@@ -70,15 +74,26 @@
 		}
 	}
 
+	function resetSearch() {
+		searchRequest++;
+		loading = false;
+		hasSearched = false;
+		searchError = null;
+		results = [];
+	}
+
 	async function loadDiscovery(targetPage = 1, append = false) {
+		const request = ++discoveryRequest;
 		if (append) {
 			discoveryLoadingMore = true;
 		} else {
 			discoveryLoading = true;
+			discoveryLoadingMore = false;
 			discoveryError = null;
 		}
 		try {
 			const data = await getDiscoveryContent({ page: targetPage, mediaType });
+			if (request !== discoveryRequest) return;
 			if (append) {
 				const existingIds = new Set(discoveryResults.map((d) => d.id));
 				const uniqueNew = data.filter((d: DiscoveryItem) => !existingIds.has(d.id));
@@ -89,11 +104,14 @@
 			discoveryPage = targetPage;
 			hasMoreDiscovery = data.length >= 20;
 		} catch (e) {
+			if (request !== discoveryRequest) return;
 			console.error('Discovery load failed', e);
 			discoveryError = 'Unable to load popular titles from TMDB.';
 		} finally {
-			discoveryLoading = false;
-			discoveryLoadingMore = false;
+			if (request === discoveryRequest) {
+				discoveryLoading = false;
+				discoveryLoadingMore = false;
+			}
 		}
 	}
 
@@ -109,9 +127,7 @@
 		if (page.url.searchParams.has('search')) {
 			goto(resolve('/'), { keepFocus: true });
 		} else {
-			hasSearched = false;
-			searchError = null;
-			results = [];
+			resetSearch();
 			searchInputEl?.focus();
 		}
 	}
@@ -121,28 +137,28 @@
 		if (page.url.searchParams.has('search')) {
 			goto(resolve('/'));
 		} else {
-			hasSearched = false;
-			searchError = null;
-			results = [];
+			resetSearch();
 			if (discoveryResults.length === 0) loadDiscovery(1, false);
 		}
 	}
 
 	async function performSearch(term: string) {
+		const request = ++searchRequest;
 		loading = true;
 		hasSearched = true;
 		searchError = null;
 		results = [];
 		try {
-			results = await searchTorrents(term);
+			const data = await searchTorrents(term);
+			if (request === searchRequest) results = data;
 		} catch (error) {
+			if (request !== searchRequest) return;
 			console.error('Search failed:', error);
 			searchError = isHttpError(error)
 				? error.body.message
 				: 'Unable to reach Jackett indexer. Check your connection or indexer status.';
-			results = [];
 		} finally {
-			loading = false;
+			if (request === searchRequest) loading = false;
 		}
 	}
 
@@ -162,6 +178,7 @@
 	}
 
 	async function openDetails(item: DiscoveryItem) {
+		const request = ++detailsRequest;
 		isModalOpen = true;
 		modalLoading = true;
 		selectedMedia = null;
@@ -170,11 +187,11 @@
 				id: item.id,
 				mediaType: item.mediaType || mediaType
 			});
-			selectedMedia = details;
+			if (request === detailsRequest) selectedMedia = details;
 		} catch (err) {
 			console.error('Failed to get media details:', err);
 		} finally {
-			modalLoading = false;
+			if (request === detailsRequest) modalLoading = false;
 		}
 	}
 
