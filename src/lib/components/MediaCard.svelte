@@ -1,12 +1,19 @@
 <script lang="ts">
-	let { title, posterUrl, year, voteAverage, onClick, onSearchClick } = $props<{
+	let {
+		title,
+		posterUrl,
+		year,
+		voteAverage,
+		onClick,
+		onSearchClick
+	}: {
 		title: string;
 		posterUrl: string;
 		year: string;
 		voteAverage?: number;
 		onClick?: () => void;
 		onSearchClick?: (e: MouseEvent) => void;
-	}>();
+	} = $props();
 </script>
 
 <article class="poster-card">
