@@ -290,26 +290,21 @@ const posterInput = v.object({
 	season: v.optional(v.number())
 });
 
-export const getPoster = query.batch(posterInput, async (inputs) => {
+// A plain query rather than query.batch: batches are POSTs, which SvelteKit rejects as
+// cross-site when the server's ORIGIN isn't configured, while GETs always get through.
+export const getPoster = query(posterInput, async (input) => {
 	const apiKey = env.TMDB_API_KEY;
-	const keyOf = ({ name, year, season }: v.InferOutput<typeof posterInput>) =>
-		`${name.toLowerCase()}|${year ?? ''}|${season ?? ''}`;
+	if (!apiKey) return '';
 
-	const posters = await Promise.all(
-		inputs.map((input) => {
-			if (!apiKey) return '';
-			const key = keyOf(input);
-			let poster = posterCache.get(key);
-			if (!poster) {
-				poster = findPoster(input, apiKey).catch((err) => {
-					console.warn('Poster lookup failed:', err);
-					posterCache.delete(key);
-					return '';
-				});
-				posterCache.set(key, poster);
-			}
-			return poster;
-		})
-	);
-	return (_input, index) => posters[index];
+	const key = `${input.name.toLowerCase()}|${input.year ?? ''}|${input.season ?? ''}`;
+	let poster = posterCache.get(key);
+	if (!poster) {
+		poster = findPoster(input, apiKey).catch((err) => {
+			console.warn('Poster lookup failed:', err);
+			posterCache.delete(key);
+			return '';
+		});
+		posterCache.set(key, poster);
+	}
+	return poster;
 });
