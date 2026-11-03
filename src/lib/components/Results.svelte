@@ -4,6 +4,7 @@
 	import { MorphIcon } from 'morphicons/svelte';
 	import { Check, ChevronDown, ChevronUp, ChevronsUpDown, Copy } from 'lucide';
 	import { extractTags, getQualityTier, type TagCategory } from '$lib/utils/title-parser';
+	import ReleasePoster from './ReleasePoster.svelte';
 
 	let { results }: { results: Torrent[] } = $props();
 
@@ -500,6 +501,7 @@
 						</td>
 						<td class="col-title" data-label="Release">
 							<div class="title-main">
+								<ReleasePoster title={result.title} />
 								<div class="actions-group">
 									{#if result.magnet}
 										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->

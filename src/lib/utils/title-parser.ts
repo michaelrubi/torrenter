@@ -145,3 +145,36 @@ export function getQualityTier(title: string): QualityInfo {
 		return { tier: 'Low Quality', score, badgeColor: 'amber' };
 	}
 }
+
+export interface MediaInfo {
+	name: string;
+	year?: number;
+	season?: number;
+}
+
+// The name of the film or show a release is of, for looking up its poster.
+export function parseMediaInfo(rawTitle: string): MediaInfo | null {
+	const title = rawTitle
+		.replace(/_/g, '.')
+		// Leading release-group tags and site prefixes, as in "[Group] " or "www.site.org - ".
+		.replace(/^(?:\s*\[[^\]]*\]\s*)+/, '')
+		.replace(/^www\.\S+\s*-\s*/i, '');
+	const releaseInfo = releaseInfoOf(title);
+	if (releaseInfo === title) return null;
+
+	const name = title
+		.slice(0, title.length - releaseInfo.length)
+		.replace(/[.\s]+/g, ' ')
+		.replace(/[\s([{-]+$/, '')
+		.trim();
+	if (!name) return null;
+
+	const yearMatch = releaseInfo.match(/^[([]?((?:19|20)\d{2})\b/);
+	const seasonMatch =
+		title.match(/\bS(\d{1,2})(?=E\d|\b)/i) || title.match(/\bSeason[\s.]*(\d{1,2})\b/i);
+	return {
+		name,
+		year: yearMatch ? parseInt(yearMatch[1], 10) : undefined,
+		season: seasonMatch ? parseInt(seasonMatch[1], 10) : undefined
+	};
+}

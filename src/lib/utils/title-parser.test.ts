@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractTags, getQualityTier, type TagCategory } from './title-parser';
+import { extractTags, getQualityTier, parseMediaInfo, type TagCategory } from './title-parser';
 
 describe('extractTags', () => {
 	it.each<[string, TagCategory, string]>([
@@ -61,5 +61,21 @@ describe('getQualityTier', () => {
 	it('does not double count a film that is named Web', () => {
 		const title = getQualityTier('The.Web.2019.1080p.BluRay.x264');
 		expect(title.score).toBe(getQualityTier('Heat.1995.1080p.BluRay.x264').score);
+	});
+});
+
+describe('parseMediaInfo', () => {
+	it.each([
+		['Dune.2021.1080p.WEB-DL.DDP5.1.H.264', { name: 'Dune', year: 2021 }],
+		['Severance.S02E05.1080p.WEB-DL.H.264-GROUP', { name: 'Severance', season: 2 }],
+		['The Office (2005) S03 1080p', { name: 'The Office', year: 2005, season: 3 }],
+		['[YTS] The_Matrix_1999_720p', { name: 'The Matrix', year: 1999 }],
+		['www.Torrenting.com - Alien.1979.2160p', { name: 'Alien', year: 1979 }]
+	])('reads %s', (title, expected) => {
+		expect(parseMediaInfo(title)).toEqual(expected);
+	});
+
+	it('gives up on titles with no release info', () => {
+		expect(parseMediaInfo('Some Random Pack')).toBeNull();
 	});
 });

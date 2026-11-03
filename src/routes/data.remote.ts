@@ -232,3 +232,84 @@ export const getMediaDetails = query(
 		}
 	}
 );
+
+interface TmdbSearchRawItem {
+	id: number;
+	media_type?: string;
+	poster_path?: string | null;
+	release_date?: string;
+	first_air_date?: string;
+	popularity?: number;
+}
+
+// Many releases share a film or season, so posters are kept for the life of the server.
+const posterCache = new Map<string, Promise<string>>();
+
+async function tmdbJson(path: string, params: Record<string, string>, apiKey: string) {
+	const url = new URL(`https://api.themoviedb.org/3/${path}`);
+	url.searchParams.set('api_key', apiKey);
+	for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+	const response = await fetch(url);
+	if (!response.ok) throw new Error(`TMDB API responded with ${response.status}`);
+	return response.json();
+}
+
+async function findPoster(
+	{ name, year, season }: { name: string; year?: number; season?: number },
+	apiKey: string
+): Promise<string> {
+	const data = await tmdbJson(
+		season ? 'search/tv' : 'search/multi',
+		{ query: name, include_adult: 'false' },
+		apiKey
+	);
+	const candidates = ((data.results || []) as TmdbSearchRawItem[]).filter(
+		(item) => season || item.media_type === 'movie' || item.media_type === 'tv'
+	);
+	const yearOf = (item: TmdbSearchRawItem) =>
+		parseInt((item.release_date || item.first_air_date || '').slice(0, 4), 10);
+	const match =
+		(year && candidates.find((item) => yearOf(item) === year)) || candidates[0] || undefined;
+	if (!match) return '';
+
+	let posterPath = match.poster_path;
+	if (season) {
+		try {
+			const seasonData = await tmdbJson(`tv/${match.id}/season/${season}`, {}, apiKey);
+			posterPath = seasonData.poster_path || posterPath;
+		} catch {
+			// Fall back to the show's poster.
+		}
+	}
+	return posterPath ? `https://image.tmdb.org/t/p/w154${posterPath}` : '';
+}
+
+const posterInput = v.object({
+	name: v.string(),
+	year: v.optional(v.number()),
+	season: v.optional(v.number())
+});
+
+export const getPoster = query.batch(posterInput, async (inputs) => {
+	const apiKey = env.TMDB_API_KEY;
+	const keyOf = ({ name, year, season }: v.InferOutput<typeof posterInput>) =>
+		`${name.toLowerCase()}|${year ?? ''}|${season ?? ''}`;
+
+	const posters = await Promise.all(
+		inputs.map((input) => {
+			if (!apiKey) return '';
+			const key = keyOf(input);
+			let poster = posterCache.get(key);
+			if (!poster) {
+				poster = findPoster(input, apiKey).catch((err) => {
+					console.warn('Poster lookup failed:', err);
+					posterCache.delete(key);
+					return '';
+				});
+				posterCache.set(key, poster);
+			}
+			return poster;
+		})
+	);
+	return (_input, index) => posters[index];
+});
