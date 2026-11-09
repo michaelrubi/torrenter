@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { MediaDetails } from '$lib/types';
 	import { fade, scale } from 'svelte/transition';
+	import TrackButton from './TrackButton.svelte';
 
 	let {
 		details,
@@ -180,6 +181,9 @@
 				</div>
 
 				<div class="modal-actions">
+					{#if details.mediaType === 'tv'}
+						<TrackButton tmdbId={details.id} />
+					{/if}
 					<button
 						class="search-torrents-btn"
 						onclick={() => {
@@ -511,6 +515,8 @@
 
 	.modal-actions {
 		display: flex;
+		flex-direction: column;
+		gap: 8px;
 		justify-content: flex-end;
 		margin-top: 8px;
 	}

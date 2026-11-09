@@ -93,3 +93,68 @@ export function mergeDuplicates(torrents: Torrent[]): Torrent[] {
 
 	return [...merged.values()];
 }
+
+function formatSize(bytes?: number, decimals = 2): string {
+	if (!bytes) return '0 Bytes';
+	const k = 1024;
+	const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
+	return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+}
+
+export function toTorrent(result: JackettRawResult): Torrent {
+	const {
+		Title: title,
+		MagnetUri,
+		Link,
+		InfoHash,
+		Seeders,
+		Peers,
+		Size,
+		PublishDate,
+		Tracker
+	} = result;
+	const magnet = MagnetUri || (Link?.startsWith('magnet:') ? Link : '');
+	const downloadUrl = toDownloadUrl(Link);
+	return {
+		id:
+			getInfoHash(magnet, InfoHash) || magnet || downloadUrl || `${Tracker}:${title}:${Size ?? 0}`,
+		title,
+		magnet,
+		downloadUrl,
+		seeds: Seeders || 0,
+		peers: Peers || 0,
+		size: formatSize(Size),
+		sizeBytes: Size || 0,
+		date: PublishDate ? new Date(PublishDate).toLocaleDateString() : '',
+		publishDate: PublishDate || '',
+		trackers: Tracker ? [Tracker] : []
+	};
+}
+
+export async function searchJackett(
+	jackettUrl: string,
+	apiKey: string,
+	searchTerm: string
+): Promise<Torrent[]> {
+	const params = new URLSearchParams({ query: searchTerm, apikey: apiKey, limit: '1000' });
+	const response = await fetch(`${jackettUrl}/api/v2.0/indexers/all/results?${params}`);
+	if (!response.ok) {
+		throw new Error(`Jackett API responded with ${response.status} ${response.statusText}`);
+	}
+	const data = await response.json();
+	const results = ((data.Results || []) as JackettRawResult[])
+		.filter((result) => !result.CategoryDesc?.toLowerCase().includes('xxx'))
+		.map(toTorrent);
+	return mergeDuplicates(results);
+}
+
+// Parses a same-origin /download link back into the parts Jackett needs.
+export function fromDownloadUrl(downloadUrl: string): DownloadParams | null {
+	if (!downloadUrl) return null;
+	const params = new URL(downloadUrl, 'http://local').searchParams;
+	const tracker = params.get('tracker');
+	const path = params.get('path');
+	const file = params.get('file');
+	return tracker && path && file ? { tracker, path, file } : null;
+}

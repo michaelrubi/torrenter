@@ -3,7 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { resolve } from '$app/paths';
 
-	let { children } = $props();
+	let { children, data } = $props();
 </script>
 
 <svelte:head>
@@ -22,6 +22,16 @@
 			<img src={favicon} alt="Torrenter" class="logo-icon" />
 			<span class="logo-text">Torrenter</span>
 		</a>
+		<nav class="user-nav">
+			{#if data.user}
+				<a href={resolve('/watchlist')}>Watchlist</a>
+				<form method="POST" action="/logout">
+					<button type="submit" title={data.user.email}>Sign out</button>
+				</form>
+			{:else}
+				<a href={resolve('/login')}>Sign in</a>
+			{/if}
+		</nav>
 	</div>
 </header>
 
@@ -44,6 +54,29 @@
 		height: 56px;
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
+	}
+
+	.user-nav {
+		display: flex;
+		align-items: center;
+		gap: var(--gap-md);
+		font-size: var(--fs-data);
+	}
+
+	.user-nav a,
+	.user-nav button {
+		color: var(--muted);
+		text-decoration: none;
+		background: none;
+		border: none;
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.user-nav a:hover,
+	.user-nav button:hover {
+		color: var(--fg);
 	}
 
 	.logo-link {

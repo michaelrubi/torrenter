@@ -3,13 +3,8 @@ import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import * as v from 'valibot';
 
-import {
-	getInfoHash,
-	mergeDuplicates,
-	toDownloadUrl,
-	type JackettRawResult
-} from '$lib/server/jackett';
-import type { Torrent, DiscoveryItem, MediaDetails } from '$lib/types';
+import { searchJackett } from '$lib/server/jackett';
+import type { DiscoveryItem, MediaDetails } from '$lib/types';
 
 interface TmdbDiscoverRawItem {
 	id: number;
@@ -35,66 +30,8 @@ export const searchTorrents = query(v.string(), async (searchTerm: string) => {
 		error(503, 'Jackett indexer is not configured (missing JACKETT_URL or JACKETT_API_KEY)');
 	}
 
-	const limit = 1000;
-	const apiUrl = `${jackettUrl}/api/v2.0/indexers/all/results?query=${encodeURIComponent(searchTerm)}&apikey=${apiKey}&limit=${limit}`;
-
 	try {
-		const response = await fetch(apiUrl);
-
-		if (!response.ok) {
-			console.error(`Jackett API error: ${response.status} ${response.statusText}`);
-			throw new Error(`Jackett API responded with ${response.status}`);
-		}
-
-		const data = await response.json();
-
-		const results: Torrent[] = ((data.Results || []) as JackettRawResult[])
-			.filter((result) => !result.CategoryDesc?.toLowerCase().includes('xxx'))
-			.map((result) => {
-				const {
-					Title: title,
-					MagnetUri,
-					Link,
-					InfoHash,
-					Seeders: seeds,
-					Peers: peers,
-					Size,
-					PublishDate,
-					Tracker: tracker
-				} = result;
-
-				const size = ((bytes = Size, decimals = 2) => {
-					if (!bytes || bytes === 0) return '0 Bytes';
-					const k = 1024;
-					const dm = decimals < 0 ? 0 : decimals;
-					const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-					const i = Math.floor(Math.log(bytes) / Math.log(k));
-					return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-				})();
-
-				const date = PublishDate ? new Date(PublishDate).toLocaleDateString() : '';
-				const magnet = MagnetUri || (Link?.startsWith('magnet:') ? Link : '');
-				const downloadUrl = toDownloadUrl(Link);
-				return {
-					id:
-						getInfoHash(magnet, InfoHash) ||
-						magnet ||
-						downloadUrl ||
-						`${tracker}:${title}:${Size ?? 0}`,
-					title,
-					magnet,
-					downloadUrl,
-					seeds: seeds || 0,
-					peers: peers || 0,
-					size,
-					sizeBytes: Size || 0,
-					date,
-					publishDate: PublishDate || '',
-					trackers: tracker ? [tracker] : []
-				};
-			});
-
-		return mergeDuplicates(results);
+		return await searchJackett(jackettUrl, apiKey, searchTerm);
 	} catch (err) {
 		console.error('Search error:', err);
 		error(502, 'Unable to reach the Jackett indexer. Check its status and try again.');
