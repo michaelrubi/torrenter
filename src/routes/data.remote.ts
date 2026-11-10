@@ -180,7 +180,13 @@ interface TmdbSearchRawItem {
 }
 
 // Many releases share a film or season, so posters are kept for the life of the server.
-const posterCache = new Map<string, Promise<string>>();
+export interface PosterMatch {
+	url: string;
+	id: number;
+	mediaType: 'movie' | 'tv';
+}
+
+const posterCache = new Map<string, Promise<PosterMatch | null>>();
 
 async function tmdbJson(path: string, params: Record<string, string>, apiKey: string) {
 	const url = new URL(`https://api.themoviedb.org/3/${path}`);
@@ -194,7 +200,7 @@ async function tmdbJson(path: string, params: Record<string, string>, apiKey: st
 async function findPoster(
 	{ name, year, season }: { name: string; year?: number; season?: number },
 	apiKey: string
-): Promise<string> {
+): Promise<PosterMatch | null> {
 	const data = await tmdbJson(
 		season ? 'search/tv' : 'search/multi',
 		{ query: name, include_adult: 'false' },
@@ -207,7 +213,7 @@ async function findPoster(
 		parseInt((item.release_date || item.first_air_date || '').slice(0, 4), 10);
 	const match =
 		(year && candidates.find((item) => yearOf(item) === year)) || candidates[0] || undefined;
-	if (!match) return '';
+	if (!match) return null;
 
 	let posterPath = match.poster_path;
 	if (season) {
@@ -218,7 +224,11 @@ async function findPoster(
 			// Fall back to the show's poster.
 		}
 	}
-	return posterPath ? `https://image.tmdb.org/t/p/w154${posterPath}` : '';
+	return {
+		url: posterPath ? `https://image.tmdb.org/t/p/w154${posterPath}` : '',
+		id: match.id,
+		mediaType: season || match.media_type === 'tv' ? 'tv' : 'movie'
+	};
 }
 
 const posterInput = v.object({
@@ -231,7 +241,7 @@ const posterInput = v.object({
 // cross-site when the server's ORIGIN isn't configured, while GETs always get through.
 export const getPoster = query(posterInput, async (input) => {
 	const apiKey = env.TMDB_API_KEY;
-	if (!apiKey) return '';
+	if (!apiKey) return null;
 
 	const key = `${input.name.toLowerCase()}|${input.year ?? ''}|${input.season ?? ''}`;
 	let poster = posterCache.get(key);
@@ -239,7 +249,7 @@ export const getPoster = query(posterInput, async (input) => {
 		poster = findPoster(input, apiKey).catch((err) => {
 			console.warn('Poster lookup failed:', err);
 			posterCache.delete(key);
-			return '';
+			return null;
 		});
 		posterCache.set(key, poster);
 	}
