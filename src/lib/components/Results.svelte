@@ -6,7 +6,13 @@
 	import { extractTags, getQualityTier, type TagCategory } from '$lib/utils/title-parser';
 	import ReleasePoster from './ReleasePoster.svelte';
 
-	let { results }: { results: Torrent[] } = $props();
+	let {
+		results,
+		onOpenDetails
+	}: {
+		results: Torrent[];
+		onOpenDetails?: (media: { id: number; mediaType: 'movie' | 'tv' }) => void;
+	} = $props();
 
 	let sortColumn = $state('seeds');
 	let sortDirection = $state('desc');
@@ -501,7 +507,7 @@
 						</td>
 						<td class="col-title" data-label="Release">
 							<div class="title-main">
-								<ReleasePoster title={result.title} />
+								<ReleasePoster title={result.title} onOpen={onOpenDetails} />
 								<div class="actions-group">
 									{#if result.magnet}
 										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->

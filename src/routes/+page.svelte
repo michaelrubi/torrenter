@@ -177,7 +177,7 @@
 		goto(`${resolve('/')}?search=${encodeURIComponent(trimmed)}`, { keepFocus: true });
 	}
 
-	async function openDetails(item: DiscoveryItem) {
+	async function openDetails(item: Pick<DiscoveryItem, 'id' | 'mediaType'>) {
 		const request = ++detailsRequest;
 		isModalOpen = true;
 		modalLoading = true;
@@ -328,7 +328,7 @@
 				<p>Try adjusting your search terms or checking different trackers</p>
 			</div>
 		{:else if hasSearched && results.length > 0}
-			<Results {results} />
+			<Results {results} onOpenDetails={openDetails} />
 		{:else}
 			<div class="discovery-section">
 				<div class="discovery-header">
