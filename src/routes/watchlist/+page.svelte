@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import {
 		getWatchlist,
 		retryDownload,
@@ -45,6 +46,15 @@
 	};
 
 	let busy = $state<Record<string, boolean>>({});
+	let editingDateId = $state<string | null>(null);
+
+	const toInputDate = (value: string) => (value ? value.slice(0, 10) : '');
+
+	async function saveAirDate(show: TrackedShow, next_air_date: string) {
+		editingDateId = null;
+		if (next_air_date === toInputDate(show.next_air_date)) return;
+		await run(show.id, () => updateShowSettings({ id: show.id, next_air_date }));
+	}
 
 	async function run(id: string, action: () => Promise<unknown>) {
 		busy[id] = true;
@@ -76,18 +86,54 @@
 		<ul class="shows">
 			{#each sortShows(watchlist.current.shows) as show (show.id)}
 				<li class="show">
-					{#if show.poster_path}
-						<img src={`https://image.tmdb.org/t/p/w154${show.poster_path}`} alt="" loading="lazy" />
-					{:else}
-						<div class="poster-placeholder"></div>
-					{/if}
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						class="poster-link"
+						href={`${resolve('/')}?search=${encodeURIComponent(show.name)}`}
+						aria-label={`Search torrents for ${show.name}`}
+						title={`Search torrents for ${show.name}`}
+					>
+						{#if show.poster_path}
+							<img
+								src={`https://image.tmdb.org/t/p/w154${show.poster_path}`}
+								alt={show.name}
+								loading="lazy"
+							/>
+						{:else}
+							<div class="poster-placeholder"></div>
+						{/if}
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
 
 					<div class="info">
 						<h2>{show.name}</h2>
-						{#if show.next_air_date}
+						{#if show.next_air_date || show.next_episode != null}
 							<p class="next">
 								<span class="code">{epCode(show.next_season, show.next_episode)}</span>
-								{formatAirDate(show.next_air_date)}
+								{#if editingDateId === show.id}
+									<input
+										type="date"
+										class="date-input"
+										aria-label={`Air date for ${show.name}`}
+										value={toInputDate(show.next_air_date)}
+										disabled={busy[show.id]}
+										onchange={(e) => saveAirDate(show, e.currentTarget.value)}
+										onblur={() => (editingDateId = null)}
+										onkeydown={(e) => {
+											if (e.key === 'Escape') editingDateId = null;
+										}}
+									/>
+								{:else}
+									<button
+										type="button"
+										class="date-btn"
+										disabled={busy[show.id]}
+										title="Click to change air date"
+										onclick={() => (editingDateId = show.id)}
+									>
+										{show.next_air_date ? formatAirDate(show.next_air_date) : 'Set air date'}
+									</button>
+								{/if}
 								{#if show.next_episode_name}<span class="ep-name">· {show.next_episode_name}</span
 									>{/if}
 							</p>
@@ -217,8 +263,22 @@
 		padding: var(--gap-sm) var(--gap-md) var(--gap-sm) var(--gap-sm);
 	}
 
+	.poster-link {
+		display: block;
+		border-radius: var(--radius-sm);
+		transition:
+			transform 0.15s ease,
+			opacity 0.15s ease;
+	}
+
+	.poster-link:hover {
+		transform: scale(1.03);
+		opacity: 0.9;
+	}
+
 	.show img,
 	.poster-placeholder {
+		display: block;
 		width: 56px;
 		height: 84px;
 		object-fit: cover;
@@ -247,6 +307,31 @@
 
 	.ep-name {
 		color: var(--muted);
+	}
+
+	.date-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		text-decoration: underline dotted var(--border);
+		text-underline-offset: 3px;
+	}
+
+	.date-btn:hover {
+		text-decoration-color: var(--accent);
+	}
+
+	.date-input {
+		background: var(--bg);
+		color: var(--fg);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		padding: 2px 6px;
+		font: inherit;
+		font-size: var(--fs-data);
 	}
 
 	.controls {

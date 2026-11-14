@@ -59,21 +59,50 @@ export function isStale(show: Pick<TrackedShow, 'last_synced'>, now = Date.now()
 
 export async function refreshShow(pb: PocketBase, show: TrackedShow): Promise<TrackedShow> {
 	const schedule = await fetchShowSchedule(show.tmdb_id);
+	// Preserve a user-adjusted earlier air date while TMDB is still on the same next episode.
+	const sameNextEpisode =
+		show.next_season != null &&
+		show.next_season === schedule.next_season &&
+		show.next_episode === schedule.next_episode;
+	if (
+		sameNextEpisode &&
+		show.next_air_date &&
+		(!schedule.next_air_date || show.next_air_date < schedule.next_air_date)
+	) {
+		schedule.next_air_date = show.next_air_date;
+	}
 	return pb
 		.collection('shows')
 		.update<TrackedShow>(show.id, { ...schedule, last_synced: new Date().toISOString() });
 }
 
-// Picks the one episode after the last grabbed one, as long as TMDB says it has aired.
-// A season rollover is assumed once TMDB's latest aired episode is in a later season.
+// Picks the one episode after the last grabbed one, as long as TMDB says it has aired
+// (or its next_air_date has been reached, e.g. when adjusted for an early release).
+// A season rollover is assumed once the latest aired episode is in a later season.
 export function nextEpisodeToGrab(
 	show: Pick<
 		TrackedShow,
 		'last_grabbed_season' | 'last_grabbed_episode' | 'last_season' | 'last_episode'
-	>
+	> &
+		Partial<Pick<TrackedShow, 'next_season' | 'next_episode' | 'next_air_date'>>,
+	now = Date.now()
 ): { season: number; episode: number } | null {
-	const lastSeason = show.last_season ?? 0;
-	const lastEpisode = show.last_episode ?? 0;
+	let lastSeason = show.last_season ?? 0;
+	let lastEpisode = show.last_episode ?? 0;
+
+	if (show.next_season && show.next_episode && show.next_air_date) {
+		const airTime = new Date(show.next_air_date.replace(' ', 'T')).getTime();
+		if (
+			!Number.isNaN(airTime) &&
+			airTime <= now &&
+			(show.next_season > lastSeason ||
+				(show.next_season === lastSeason && show.next_episode > lastEpisode))
+		) {
+			lastSeason = show.next_season;
+			lastEpisode = show.next_episode;
+		}
+	}
+
 	if (!lastSeason || !lastEpisode) return null;
 
 	const grabbedSeason = show.last_grabbed_season ?? 0;

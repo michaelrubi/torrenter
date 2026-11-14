@@ -64,6 +64,54 @@ describe('nextEpisodeToGrab', () => {
 			})
 		).toBeNull();
 	});
+
+	it('grabs the next episode when its air date has arrived early', () => {
+		const now = Date.parse('2026-11-14T12:00:00Z');
+		expect(
+			nextEpisodeToGrab(
+				{
+					last_grabbed_season: 2,
+					last_grabbed_episode: 4,
+					last_season: 2,
+					last_episode: 4,
+					next_season: 2,
+					next_episode: 5,
+					next_air_date: '2026-11-14 00:00:00.000Z'
+				},
+				now
+			)
+		).toEqual({ season: 2, episode: 5 });
+
+		expect(
+			nextEpisodeToGrab(
+				{
+					last_grabbed_season: 2,
+					last_grabbed_episode: 5,
+					last_season: 2,
+					last_episode: 4,
+					next_season: 2,
+					next_episode: 5,
+					next_air_date: '2026-11-14 00:00:00.000Z'
+				},
+				now
+			)
+		).toBeNull();
+
+		expect(
+			nextEpisodeToGrab(
+				{
+					last_grabbed_season: 2,
+					last_grabbed_episode: 4,
+					last_season: 2,
+					last_episode: 4,
+					next_season: 2,
+					next_episode: 5,
+					next_air_date: '2026-11-20 00:00:00.000Z'
+				},
+				now
+			)
+		).toBeNull();
+	});
 });
 
 describe('pickRelease', () => {

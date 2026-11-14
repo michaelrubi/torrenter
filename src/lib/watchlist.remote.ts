@@ -73,11 +73,19 @@ export const updateShowSettings = command(
 	v.object({
 		id: v.string(),
 		auto_download: v.optional(v.boolean()),
-		quality: v.optional(v.picklist(['any', '720p', '1080p', '2160p']))
+		quality: v.optional(v.picklist(['any', '720p', '1080p', '2160p'])),
+		next_air_date: v.optional(v.string())
 	}),
-	async ({ id, ...changes }) => {
+	async ({ id, next_air_date, ...changes }) => {
 		const { pb } = requireUser();
-		const show = await pb.collection('shows').update<TrackedShow>(id, changes);
+		const patch: Partial<TrackedShow> = { ...changes };
+		if (next_air_date !== undefined) {
+			if (next_air_date && !/^\d{4}-\d{2}-\d{2}$/.test(next_air_date)) {
+				error(400, 'Invalid air date');
+			}
+			patch.next_air_date = next_air_date ? `${next_air_date} 00:00:00.000Z` : '';
+		}
+		const show = await pb.collection('shows').update<TrackedShow>(id, patch);
 		getTrackedShow(show.tmdb_id).set(show);
 		getWatchlist().refresh();
 		return show;
